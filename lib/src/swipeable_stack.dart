@@ -12,16 +12,6 @@ enum SwipeDirection {
   down,
 }
 
-class _SwipeRatePerThreshold {
-  _SwipeRatePerThreshold({
-    required this.direction,
-    required this.rate,
-  }) : assert(rate >= 0);
-
-  final SwipeDirection direction;
-  final double rate;
-}
-
 typedef SwipeableStackItemBuilder<T extends Identifiable> = Widget Function(
   BuildContext context,
   T data,
@@ -30,12 +20,12 @@ typedef SwipeableStackItemBuilder<T extends Identifiable> = Widget Function(
 
 class SwipeableStack<T extends Identifiable> extends StatefulWidget {
   const SwipeableStack({
-    required this.dataSets,
+    required this.dataSet,
     required this.builder,
     Key? key,
   }) : super(key: key);
 
-  final ValueNotifier<List<T>> dataSets;
+  final ValueNotifier<List<T>> dataSet;
   final SwipeableStackItemBuilder<T> builder;
 
   @override
@@ -44,34 +34,37 @@ class SwipeableStack<T extends Identifiable> extends StatefulWidget {
 
 class _SwipeableStackState<T extends Identifiable>
     extends State<SwipeableStack<T>> with TickerProviderStateMixin {
-  List<CardProperty<T>> _cardProperties = [];
+  late final List<CardProperty<T>> _oldCardProperties;
   BoxConstraints? _areConstraints;
 
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   _cardProperties = widget.dataSets.value
-  //       .map((data) => CardProperty<T>(data: data))
-  //       .toList();
-  // }
-  //
-  // @override
-  // void didUpdateWidget(covariant SwipeableStack<T> oldWidget) {
-  //   super.didUpdateWidget(oldWidget);
-  //   final difference = widget.dataSets.difference(oldWidget.dataSets);
-  //   if (difference.isEmpty) {
-  //     return;
-  //   }
-  //   for (final item in difference) {
-  //     final added = oldWidget.dataSets.get(item.id);
-  //     if (added != null) {
-  //       _cardProperties.add(CardProperty<T>(data: added as T));
-  //       continue;
-  //     }
-  //     _cardProperties.removeWhere((element) => element.id == item.id);
-  //   }
-  //   setState(() {});
-  // }
+  @override
+  void initState() {
+    super.initState();
+    _oldCardProperties = widget.dataSet.value
+        .map((data) => CardProperty<T>(data: data))
+        .toList();
+    widget.dataSet.addListener(
+      () {
+        final newCardProperties = widget.dataSet.value
+            .map((data) => CardProperty<T>(data: data))
+            .toList();
+        final removed = _oldCardProperties.removedDifference(
+          newData: newCardProperties,
+        );
+        final added = _oldCardProperties.addedDifference(
+          newData: newCardProperties,
+        );
+        for (final item in removed) {
+          // TODO(heavenOSK): Manage removed items which is swiped.
+          _oldCardProperties.removeWhere((element) => element.id == item.id);
+        }
+        for (final item in added) {
+          _oldCardProperties.add(item);
+        }
+        setState(() {});
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,22 +96,19 @@ class _SwipeableStackState<T extends Identifiable>
 
   List<Widget> _buildCards(BuildContext context, BoxConstraints constraints) {
     final notJudgedCardProperties =
-        _cardProperties.where((element) => !element.isJudged).toList();
-    final visibleCardProperties = notJudgedCardProperties
-        .sublist(math.min(3, notJudgedCardProperties.length));
-    return [];
-    // return List.generate(visibleCardProperties.length, (index) {
-    //   final cp = visibleCardProperties[index];
-    //   return _buildCard(
-    //     index: index,
-    //     data: cp.data,
-    //     child: widget.builder(
-    //       context,
-    //       cp.data,
-    //       _areConstraints!,
-    //     ),
-    //     constraints: _areConstraints!,
-    //   );
-    // }).reversed.toList();
+        _oldCardProperties.where((element) => !element.isJudged).toList();
+    final visibleCardProperties = notJudgedCardProperties.sublist(
+      0,
+      math.min(3, notJudgedCardProperties.length),
+    );
+
+    return List.generate(visibleCardProperties.length, (index) {
+      final cp = visibleCardProperties[index];
+      return widget.builder(
+        context,
+        cp.data,
+        _areConstraints!,
+      );
+    }).reversed.toList();
   }
 }

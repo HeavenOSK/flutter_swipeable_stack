@@ -21,7 +21,7 @@ class CardData extends Identifiable {
   }
 
   static List<CardData> initialDeck() {
-    final color = Colors.transparent;
+    final color = Colors.green;
     return [
       CardData(
         id: '1',
@@ -42,7 +42,7 @@ class CardData extends Identifiable {
   }
 
   static List<CardData> newDeck() {
-    final color = Colors.green;
+    final color = Colors.red;
     return [
       CardData(
         id: '4',

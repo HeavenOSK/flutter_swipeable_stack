@@ -11,10 +11,20 @@ abstract class Identifiable {
 }
 
 extension DifferenceX on List<Identifiable> {
-  Set<Identifiable> difference(List<Identifiable> oldData) {
-    final newDataSet = Set<Identifiable>.from(this);
-    final oldDataSet = Set<Identifiable>.from(oldData);
+  Set<T> addedDifference<T extends Identifiable>({
+    required List<T> newData,
+  }) {
+    final oldDataSet = Set<T>.from(this);
+    final newDataSet = Set<T>.from(newData);
     return newDataSet.difference(oldDataSet);
+  }
+
+  Set<T> removedDifference<T extends Identifiable>({
+    required List<T> newData,
+  }) {
+    final oldDataSet = Set<T>.from(this);
+    final newDataSet = Set<T>.from(newData);
+    return oldDataSet.difference(newDataSet);
   }
 
   Identifiable? get(String id) => this.firstWhereOrNull(
