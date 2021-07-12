@@ -1,18 +1,18 @@
 import 'package:swipeable_stack/src/identifiable.dart';
 
-class CardProperty extends Identifiable {
+class CardProperty<T extends Identifiable> extends Identifiable {
   CardProperty({
     required this.data,
     this.isJudged = false,
   });
 
-  final Identifiable data;
+  final T data;
   final bool isJudged;
 
   @override
   String get id => data.id;
 
-  CardProperty copyWithJudged({
+  CardProperty<T> copyWithJudged({
     required bool isJudged,
   }) {
     return CardProperty(

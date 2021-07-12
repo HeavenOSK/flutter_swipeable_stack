@@ -1,6 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:swipeable_stack/src/card_property.dart';
-import 'dart:math' as math;
 
 import 'identifiable.dart';
 import 'swipe_session.dart';
@@ -36,7 +37,7 @@ extension _SwipeDirectionX on SwipeDirection {
     }
   }
 
-  bool get isHorizontal =>
+  bool get _isHorizontal =>
       this == SwipeDirection.right || this == SwipeDirection.left;
 }
 
@@ -118,29 +119,37 @@ extension _SwipeSessionX on SwipeSession {
   }
 }
 
-typedef SwipeableStackItemBuilder = Widget Function(
+typedef SwipeableStackItemBuilder<T extends Identifiable> = Widget Function(
   BuildContext context,
-  Identifiable dataSet,
+  T data,
   BoxConstraints constraints,
 );
+typedef OnWillMoveNext = bool Function(
+  String id,
+  SwipeDirection swipeDirection,
+);
 
-class SwipeableStack extends StatefulWidget {
+class SwipeableStack<T extends Identifiable> extends StatefulWidget {
   const SwipeableStack({
     required this.builder,
     this.dataSets = const [],
+    this.onWillMoveNext,
     this.viewFraction = _defaultViewFraction,
+    this.swipeAssistDuration = _defaultSwipeAssistDuration,
     this.horizontalSwipeThreshold = _defaultHorizontalSwipeThreshold,
     this.verticalSwipeThreshold = _defaultVerticalSwipeThreshold,
     Key? key,
   }) : super(key: key);
 
-  final List<Identifiable> dataSets;
-  final SwipeableStackItemBuilder builder;
+  final List<T> dataSets;
+  final SwipeableStackItemBuilder<T> builder;
   final double viewFraction;
 
   static const double _defaultHorizontalSwipeThreshold = 0.44;
   static const double _defaultVerticalSwipeThreshold = 0.32;
   static const double _defaultViewFraction = 0.92;
+  final Duration swipeAssistDuration;
+  final OnWillMoveNext? onWillMoveNext;
 
   final double horizontalSwipeThreshold;
 
@@ -153,11 +162,11 @@ class SwipeableStack extends StatefulWidget {
   static const _defaultStackClipBehaviour = Clip.hardEdge;
 
   @override
-  _SwipeableStackState createState() => _SwipeableStackState();
+  _SwipeableStackState<T> createState() => _SwipeableStackState<T>();
 }
 
-class _SwipeableStackState extends State<SwipeableStack>
-    with TickerProviderStateMixin {
+class _SwipeableStackState<T extends Identifiable>
+    extends State<SwipeableStack<T>> with TickerProviderStateMixin {
   late final AnimationController _swipeCancelAnimationController =
       AnimationController(
     vsync: this,
@@ -179,6 +188,105 @@ class _SwipeableStackState extends State<SwipeableStack>
     vsync: this,
   );
 
+  double _distanceToAssist({
+    required BuildContext context,
+    required Offset difference,
+    required SwipeDirection swipeDirection,
+  }) {
+    final deviceSize = MediaQuery.of(context).size;
+    if (swipeDirection._isHorizontal) {
+      double _backMoveDistance({
+        required double moveDistance,
+        required double maxWidth,
+        required double maxHeight,
+      }) {
+        final cardAngle = _SwipablePositioned.calculateAngle(
+          moveDistance,
+          maxWidth,
+        ).abs();
+        return math.cos(math.pi / 2 - cardAngle) * maxHeight;
+      }
+
+      double _remainingDistance({
+        required double moveDistance,
+        required double maxWidth,
+        required double maxHeight,
+      }) {
+        final backMoveDistance = _backMoveDistance(
+          moveDistance: moveDistance,
+          maxHeight: maxHeight,
+          maxWidth: maxWidth,
+        );
+        final diff = maxWidth - (moveDistance - backMoveDistance);
+        return diff < 1
+            ? moveDistance
+            : _remainingDistance(
+                moveDistance: moveDistance + diff,
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+              );
+      }
+
+      final maxWidth = _areConstraints?.maxWidth ?? deviceSize.width;
+      final maxHeight = _areConstraints?.maxHeight ?? deviceSize.height;
+      final maxDistance = _remainingDistance(
+        moveDistance: maxWidth,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+      );
+      return maxDistance - difference.dx.abs();
+    } else {
+      return deviceSize.height - difference.dy.abs();
+    }
+  }
+
+  Offset _offsetToAssist({
+    required Offset difference,
+    required BuildContext context,
+    required SwipeDirection swipeDirection,
+    required double distToAssist,
+  }) {
+    final isHorizontal = swipeDirection._isHorizontal;
+    if (isHorizontal) {
+      final adjustedHorizontally = Offset(difference.dx * 2, difference.dy);
+      final absX = adjustedHorizontally.dx.abs();
+      final rate = distToAssist / absX;
+      return adjustedHorizontally * rate;
+    } else {
+      final adjustedVertically = Offset(difference.dx, difference.dy * 2);
+      final absY = adjustedVertically.dy.abs();
+      final rate = distToAssist / absY;
+      return adjustedVertically * rate;
+    }
+  }
+
+  Duration _getSwipeAssistDuration({
+    required SwipeDirection swipeDirection,
+    required Offset difference,
+    required double distToAssist,
+  }) {
+    final pixelPerMilliseconds = swipeDirection._isHorizontal ? 1.25 : 2.0;
+
+    return Duration(
+      milliseconds: math.min(
+        distToAssist ~/ pixelPerMilliseconds,
+        widget.swipeAssistDuration.inMilliseconds,
+      ),
+    );
+  }
+
+  Duration _getSwipeAnimationDuration({
+    required SwipeDirection swipeDirection,
+    required Offset difference,
+    required double distToAssist,
+  }) {
+    final pixelPerMilliseconds = swipeDirection._isHorizontal ? 0.78 : 1.25;
+
+    return Duration(
+      milliseconds: math.min(distToAssist ~/ pixelPerMilliseconds, 650),
+    );
+  }
+
   bool get canSwipe =>
       !_swipeAssistController.animating &&
       !_swipeAnimationController.animating &&
@@ -190,19 +298,20 @@ class _SwipeableStackState extends State<SwipeableStack>
       !_swipeCancelAnimationController.animating &&
       !_rewindAnimationController.animating;
 
-  List<CardProperty> _cardProperties = [];
+  List<CardProperty<T>> _cardProperties = [];
   BoxConstraints? _areConstraints;
   SwipeSession? _currentSession;
 
   @override
   void initState() {
     super.initState();
-    _cardProperties =
-        widget.dataSets.map((data) => CardProperty(data: data)).toList();
+    _cardProperties = widget.dataSets
+        .map((data) => CardProperty<T>(data: data as T))
+        .toList();
   }
 
   @override
-  void didUpdateWidget(covariant SwipeableStack oldWidget) {
+  void didUpdateWidget(covariant SwipeableStack<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     final difference = widget.dataSets.difference(oldWidget.dataSets);
     if (difference.isEmpty) {
@@ -211,7 +320,7 @@ class _SwipeableStackState extends State<SwipeableStack>
     for (final item in difference) {
       final added = oldWidget.dataSets.get(item.id);
       if (added != null) {
-        _cardProperties.add(CardProperty(data: added));
+        _cardProperties.add(CardProperty<T>(data: added as T));
         continue;
       }
       _cardProperties.removeWhere((element) => element.id == item.id);
@@ -265,7 +374,7 @@ class _SwipeableStackState extends State<SwipeableStack>
         ),
         constraints: _areConstraints!,
       );
-    });
+    }).reversed.toList();
   }
 
   Widget _buildCard({
@@ -298,7 +407,7 @@ class _SwipeableStackState extends State<SwipeableStack>
               ..stop()
               ..reset();
           }
-          _currentSession = updateSwipe(
+          _updateSwipe(
             SwipeSession(
               localPosition: d.localPosition,
               startPosition: d.globalPosition,
@@ -318,7 +427,7 @@ class _SwipeableStackState extends State<SwipeableStack>
           final updated = _currentSession?.copyWith(
             currentPosition: d.globalPosition,
           );
-          widget.controller.updateSwipe(
+          _updateSwipe(
             updated ??
                 SwipeSession(
                   localPosition: d.localPosition,
@@ -342,7 +451,7 @@ class _SwipeableStackState extends State<SwipeableStack>
             return;
           }
           final allowMoveNext = widget.onWillMoveNext?.call(
-                _currentIndex,
+                data.id,
                 swipeAssistDirection,
               ) ??
               true;
@@ -350,7 +459,10 @@ class _SwipeableStackState extends State<SwipeableStack>
             _cancelSwipe();
             return;
           }
-          _swipeNext(swipeAssistDirection);
+          _swipeNext(
+            data,
+            swipeAssistDirection,
+          );
         },
         child: child,
       ),
@@ -375,7 +487,7 @@ class _SwipeableStackState extends State<SwipeableStack>
   }
 
   void _cancelSwipe() {
-    final currentSession = widget.controller.currentSession;
+    final currentSession = _currentSession;
     if (currentSession == null) {
       return;
     }
@@ -389,21 +501,24 @@ class _SwipeableStackState extends State<SwipeableStack>
 
     cancelAnimation.addListener(_animate);
     _swipeCancelAnimationController.forward(from: 0).then(
-          (_) {
+      (_) {
         cancelAnimation.removeListener(_animate);
-        widget.controller.cancelAction();
+        resetCurrentSession();
       },
     ).catchError((dynamic c) {
       cancelAnimation.removeListener(_animate);
-      widget.controller.cancelAction();
+      resetCurrentSession();
     });
   }
 
-  void _swipeNext(SwipeDirection swipeDirection) {
+  void _swipeNext(
+    Identifiable data,
+    SwipeDirection swipeDirection,
+  ) {
     if (!canSwipe) {
       return;
     }
-    final currentSession = widget.controller.currentSession;
+    final currentSession = _currentSession;
     if (currentSession == null) {
       return;
     }
@@ -435,19 +550,37 @@ class _SwipeableStackState extends State<SwipeableStack>
 
     animation.addListener(animate);
     _swipeAssistController.forward(from: 0).then(
-          (_) {
+      (_) {
         animation.removeListener(animate);
-        widget.controller.completeAction();
+        completeAction(data);
       },
     ).catchError((dynamic c) {
       animation.removeListener(animate);
-      widget.controller.cancelAction();
+      resetCurrentSession();
     });
   }
-  void completeAction() {
 
-    _currentSessionState = null;
-    notifyListeners();
+  void completeAction(Identifiable data) {
+    final index = _cardProperties.indexWhere(
+      (element) => element.id == data.id,
+    );
+    if (0 <= index) {
+      final targetCardProperty = _cardProperties[index];
+      _cardProperties.removeAt(index);
+      _cardProperties.insert(
+        index,
+        targetCardProperty.copyWithJudged(
+          isJudged: true,
+        ),
+      );
+    }
+    _currentSession = null;
+    setState(() {});
+  }
+
+  void resetCurrentSession() {
+    _currentSession = null;
+    setState(() {});
   }
 }
 
