@@ -5,13 +5,13 @@ class CardData extends Identifiable {
   CardData({
     required this.id,
     required this.path,
-    required this.overlayColor,
+    required this.color,
   });
 
   @override
   final String id;
   final String path;
-  final Color overlayColor;
+  final Color color;
 
   @override
   String toString() {
@@ -25,17 +25,17 @@ class CardData extends Identifiable {
     return [
       CardData(
         id: '1',
-        overlayColor: color,
+        color: color,
         path: 'images/image_1.jpg',
       ),
       CardData(
         id: '2',
-        overlayColor: color,
+        color: color,
         path: 'images/image_2.jpg',
       ),
       CardData(
         id: '3',
-        overlayColor: color,
+        color: color,
         path: 'images/image_3.jpg',
       ),
     ];
@@ -46,17 +46,17 @@ class CardData extends Identifiable {
     return [
       CardData(
         id: '4',
-        overlayColor: color,
+        color: color,
         path: 'images/image_1.jpg',
       ),
       CardData(
         id: '5',
-        overlayColor: color,
+        color: color,
         path: 'images/image_2.jpg',
       ),
       CardData(
         id: '6',
-        overlayColor: color,
+        color: color,
         path: 'images/image_3.jpg',
       ),
     ];
@@ -66,18 +66,18 @@ class CardData extends Identifiable {
     final color = Colors.blue;
     return [
       CardData(
-        id: '1',
-        overlayColor: color,
+        id: '2',
+        color: color,
         path: 'images/image_1.jpg',
       ),
       CardData(
-        id: '8',
-        overlayColor: color,
+        id: '7',
+        color: color,
         path: 'images/image_2.jpg',
       ),
       CardData(
-        id: '9',
-        overlayColor: color,
+        id: '8',
+        color: color,
         path: 'images/image_3.jpg',
       ),
     ];

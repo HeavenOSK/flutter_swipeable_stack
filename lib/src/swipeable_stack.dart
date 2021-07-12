@@ -12,6 +12,21 @@ enum SwipeDirection {
   down,
 }
 
+class SwipeableStackController {
+  SwipeableStackController();
+
+  /// The key for [SwipableStack] to control.
+  final _swipeableStackStateKey = GlobalKey<_SwipeableStackState>();
+
+  void next() {
+    _swipeableStackStateKey.currentState?._moveFocusForward();
+  }
+
+  void rewind() {
+    _swipeableStackStateKey.currentState?._moveFocusBack();
+  }
+}
+
 typedef SwipeableStackItemBuilder<T extends Identifiable> = Widget Function(
   BuildContext context,
   T data,
@@ -19,12 +34,15 @@ typedef SwipeableStackItemBuilder<T extends Identifiable> = Widget Function(
 );
 
 class SwipeableStack<T extends Identifiable> extends StatefulWidget {
-  const SwipeableStack({
+  SwipeableStack({
+    SwipeableStackController? controller,
     required this.dataSet,
     required this.builder,
     Key? key,
-  }) : super(key: key);
+  })  : controller = controller ?? SwipeableStackController(),
+        super(key: controller?._swipeableStackStateKey);
 
+  final SwipeableStackController controller;
   final ValueNotifier<List<T>> dataSet;
   final SwipeableStackItemBuilder<T> builder;
 
@@ -36,6 +54,18 @@ class _SwipeableStackState<T extends Identifiable>
     extends State<SwipeableStack<T>> with TickerProviderStateMixin {
   late final List<CardProperty<T>> _oldCardProperties;
   BoxConstraints? _areConstraints;
+
+  List<CardProperty<T>> get _visibleCardProperties {
+    final notJudgedCardProperties =
+        _oldCardProperties.where((element) => !element.isJudged).toList();
+    return notJudgedCardProperties.sublist(
+      0,
+      math.min(3, notJudgedCardProperties.length),
+    );
+  }
+
+  CardProperty<T>? get _focusCardProperty =>
+      _visibleCardProperties.isNotEmpty ? _visibleCardProperties.first : null;
 
   @override
   void initState() {
@@ -55,7 +85,6 @@ class _SwipeableStackState<T extends Identifiable>
           newData: newCardProperties,
         );
         for (final item in removed) {
-          // TODO(heavenOSK): Manage removed items which is swiped.
           _oldCardProperties.removeWhere((element) => element.id == item.id);
         }
         for (final item in added) {
@@ -95,20 +124,58 @@ class _SwipeableStackState<T extends Identifiable>
   }
 
   List<Widget> _buildCards(BuildContext context, BoxConstraints constraints) {
-    final notJudgedCardProperties =
-        _oldCardProperties.where((element) => !element.isJudged).toList();
-    final visibleCardProperties = notJudgedCardProperties.sublist(
-      0,
-      math.min(3, notJudgedCardProperties.length),
-    );
-
-    return List.generate(visibleCardProperties.length, (index) {
-      final cp = visibleCardProperties[index];
-      return widget.builder(
-        context,
-        cp.data,
-        _areConstraints!,
+    return List.generate(_visibleCardProperties.length, (index) {
+      final cp = _visibleCardProperties[index];
+      return Positioned(
+        key: ValueKey(cp.id),
+        child: widget.builder(
+          context,
+          cp.data,
+          _areConstraints!,
+        ),
       );
     }).reversed.toList();
+  }
+
+  void _moveFocusForward() {
+    final _focusCardProperty = this._focusCardProperty;
+    if (_focusCardProperty == null) {
+      return;
+    }
+    final index = _oldCardProperties.indexWhere(
+      (cp) => cp.id == _focusCardProperty.id,
+    );
+    _oldCardProperties.replaceRange(
+      index,
+      index + 1,
+      [_oldCardProperties[index].copyWithJudged(isJudged: true)],
+    );
+    setState(() {});
+  }
+
+  void _moveFocusBack() {
+    if (_oldCardProperties.isEmpty) {
+      return;
+    }
+    int _focusIndex() {
+      final focusId = _focusCardProperty?.id;
+      if (focusId == null) {
+        return _oldCardProperties.length;
+      }
+      return _oldCardProperties.indexWhere(
+        (cp) => cp.id == focusId,
+      );
+    }
+
+    final nextIndex = _focusIndex() - 1;
+    if (nextIndex < 0) {
+      return;
+    }
+    _oldCardProperties.replaceRange(
+      nextIndex,
+      nextIndex + 1,
+      [_oldCardProperties[nextIndex].copyWithJudged(isJudged: false)],
+    );
+    setState(() {});
   }
 }
