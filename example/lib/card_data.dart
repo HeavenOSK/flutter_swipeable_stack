@@ -13,6 +13,13 @@ class CardData extends Identifiable {
   final String path;
   final Color overlayColor;
 
+  @override
+  String toString() {
+    return 'CardData('
+        '$id'
+        ')';
+  }
+
   static List<CardData> initialDeck() {
     final color = Colors.transparent;
     return [

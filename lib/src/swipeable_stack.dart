@@ -47,31 +47,31 @@ class _SwipeableStackState<T extends Identifiable>
   List<CardProperty<T>> _cardProperties = [];
   BoxConstraints? _areConstraints;
 
-  @override
-  void initState() {
-    super.initState();
-    _cardProperties = widget.dataSets.value
-        .map((data) => CardProperty<T>(data: data))
-        .toList();
-  }
-
-  @override
-  void didUpdateWidget(covariant SwipeableStack<T> oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final difference = widget.dataSets.difference(oldWidget.dataSets);
-    if (difference.isEmpty) {
-      return;
-    }
-    for (final item in difference) {
-      final added = oldWidget.dataSets.get(item.id);
-      if (added != null) {
-        _cardProperties.add(CardProperty<T>(data: added as T));
-        continue;
-      }
-      _cardProperties.removeWhere((element) => element.id == item.id);
-    }
-    setState(() {});
-  }
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _cardProperties = widget.dataSets.value
+  //       .map((data) => CardProperty<T>(data: data))
+  //       .toList();
+  // }
+  //
+  // @override
+  // void didUpdateWidget(covariant SwipeableStack<T> oldWidget) {
+  //   super.didUpdateWidget(oldWidget);
+  //   final difference = widget.dataSets.difference(oldWidget.dataSets);
+  //   if (difference.isEmpty) {
+  //     return;
+  //   }
+  //   for (final item in difference) {
+  //     final added = oldWidget.dataSets.get(item.id);
+  //     if (added != null) {
+  //       _cardProperties.add(CardProperty<T>(data: added as T));
+  //       continue;
+  //     }
+  //     _cardProperties.removeWhere((element) => element.id == item.id);
+  //   }
+  //   setState(() {});
+  // }
 
   @override
   Widget build(BuildContext context) {

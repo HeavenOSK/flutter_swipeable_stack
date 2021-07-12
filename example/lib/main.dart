@@ -33,8 +33,16 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   late final _cards = ValueNotifier<List<CardData>>(
-    const [],
+    CardData.initialDeck(),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _cards.addListener(
+      () => print(_cards),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,16 +59,24 @@ class _HomeState extends State<Home> {
             Row(
               children: [
                 _bottomButton(
-                  onPressed: () {},
+                  onPressed: _initDeck,
                   color: Colors.amber,
                   label: 'Initialize',
                 ),
                 _bottomButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      _addCards(
+                        cards: CardData.newDeck(),
+                      );
+                    },
                     color: Colors.blue,
                     label: 'add new cards'),
                 _bottomButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    _addCards(
+                      cards: CardData.includesOldCard(),
+                    );
+                  },
                   color: Colors.green,
                   label: 'add new & old cards',
                 ),
@@ -76,7 +92,17 @@ class _HomeState extends State<Home> {
 
   void _rewind() {}
 
-  void _addCard() {}
+  void _initDeck() {
+    _cards
+      ..value = []
+      ..value = CardData.initialDeck();
+  }
+
+  void _addCards({
+    required List<CardData> cards,
+  }) {
+    _cards.value += cards;
+  }
 
   Widget _bottomButton({
     required Color color,
