@@ -14,7 +14,8 @@ enum SwipeDirection {
   down,
 }
 
-class SwipeableStackController<T extends Identifiable> extends ChangeNotifier {
+class SwipeableStackController<T extends SwipeableStackIdentifiable>
+    extends ChangeNotifier {
   SwipeableStackController();
 
   final _swipeableStackStateKey = GlobalKey<_SwipeableStackState>();
@@ -116,7 +117,8 @@ class SwipeableStackController<T extends Identifiable> extends ChangeNotifier {
   }
 }
 
-extension _CardPropertiesX<T extends Identifiable> on List<CardProperty<T>> {
+extension _CardPropertiesX<T extends SwipeableStackIdentifiable>
+    on List<CardProperty<T>> {
   void _replaceAt(
     int index, {
     required CardProperty<T> replacement,
@@ -254,7 +256,8 @@ extension _SwipeSessionX on CardDisplayInformation {
   }
 }
 
-class SwipeableStack<T extends Identifiable> extends StatefulWidget {
+class SwipeableStack<T extends SwipeableStackIdentifiable>
+    extends StatefulWidget {
   SwipeableStack({
     SwipeableStackController<T>? controller,
     required this.dataSet,
@@ -289,7 +292,7 @@ class SwipeableStack<T extends Identifiable> extends StatefulWidget {
   _SwipeableStackState<T> createState() => _SwipeableStackState<T>();
 }
 
-class _SwipeableStackState<T extends Identifiable>
+class _SwipeableStackState<T extends SwipeableStackIdentifiable>
     extends State<SwipeableStack<T>> with TickerProviderStateMixin {
   late final SwipeableStackController<T> _controller = widget.controller;
 
