@@ -47,6 +47,12 @@ class CardDisplayInformation {
       'localPosition:$localPosition'
       ')';
 
+  CardDisplayInformation clone() => CardDisplayInformation(
+        startPosition: startPosition,
+        currentPosition: currentPosition,
+        localPosition: localPosition,
+      );
+
   CardDisplayInformation copyWith({
     Offset? startPosition,
     Offset? currentPosition,

@@ -170,7 +170,9 @@ class _HomeState extends State<Home> {
                           label: 'rewind',
                         ),
                         _button(
-                          onPressed: _controller.next,
+                          onPressed: () => _controller.next(
+                            swipeDirection: SwipeDirection.right,
+                          ),
                           color: Colors.pink,
                           label: 'next',
                         ),

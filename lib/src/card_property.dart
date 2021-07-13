@@ -18,12 +18,13 @@ class CardProperty<T extends Identifiable> extends Identifiable {
   CardProperty<T> copyWith({
     T? data,
     bool? isJudged,
-    CardDisplayInformation? displayInformation,
+    CardDisplayInformation? lastDisplayInformation,
   }) {
     return CardProperty(
       data: data ?? this.data,
       isJudged: isJudged ?? this.isJudged,
-      lastDisplayInformation: displayInformation ?? this.lastDisplayInformation,
+      lastDisplayInformation:
+          lastDisplayInformation ?? this.lastDisplayInformation,
     );
   }
 }

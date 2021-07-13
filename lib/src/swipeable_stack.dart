@@ -1,9 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:swipeable_stack/src/card_display_information.dart';
-import 'package:swipeable_stack/src/card_property.dart';
 
+import 'callbacks.dart';
+import 'card_display_information.dart';
+import 'card_property.dart';
 import 'identifiable.dart';
 
 enum SwipeDirection {
@@ -19,21 +20,59 @@ class SwipeableStackController {
   /// The key for [SwipableStack] to control.
   final _swipeableStackStateKey = GlobalKey<_SwipeableStackState>();
 
-  void next() {
-    _swipeableStackStateKey.currentState?._moveFocusForward();
+  void next({
+    required SwipeDirection swipeDirection,
+    bool shouldCallCompletionCallback = true,
+    bool ignoreOnWillMoveNext = false,
+    Duration? duration,
+  }) {
+    _swipeableStackStateKey.currentState?._next(
+      swipeDirection: swipeDirection,
+      shouldCallCompletionCallback: shouldCallCompletionCallback,
+      ignoreOnWillMoveNext: ignoreOnWillMoveNext,
+      duration: duration,
+    );
   }
 
-  void rewind() {
-    _swipeableStackStateKey.currentState?._moveFocusBack();
+  void rewind({
+    Duration duration = const Duration(milliseconds: 650),
+  }) {
+    _swipeableStackStateKey.currentState?._rewind(
+      duration: duration,
+    );
   }
 }
 
-extension _ReplaceAt<E> on List<E> {
-  void replaceAt(
+extension CardPropertiesX<T extends Identifiable> on List<CardProperty<T>> {
+  void _replaceAt(
     int index, {
-    required E replacement,
+    required CardProperty<T> replacement,
   }) =>
-      this.replaceRange(index, index + 1, [replacement]);
+      this.replaceRange(
+        index,
+        index + 1,
+        [replacement],
+      );
+
+  void judgeWithId(
+    String id, {
+    required bool isJudged,
+    required CardDisplayInformation? lastCardDisplayInformation,
+  }) {
+    final index = indexWhere(
+      (element) => element.id == id,
+    );
+    if (index < 0) {
+      return;
+    }
+    _replaceAt(
+      index,
+      replacement: this[index].copyWith(
+        isJudged: isJudged,
+        lastDisplayInformation: lastCardDisplayInformation,
+      ),
+    );
+  }
 }
 
 class _SwipeRatePerThreshold {
@@ -142,41 +181,36 @@ extension _SwipeSessionX on CardDisplayInformation {
   }
 }
 
-typedef SwipeableStackItemBuilder<T extends Identifiable> = Widget Function(
-  BuildContext context,
-  T data,
-  BoxConstraints constraints,
-);
-
 class SwipeableStack<T extends Identifiable> extends StatefulWidget {
   SwipeableStack({
     SwipeableStackController? controller,
     required this.dataSet,
     required this.builder,
-    this.horizontalSwipeThreshold = _defaultHorizontalSwipeThreshold,
-    this.verticalSwipeThreshold = _defaultVerticalSwipeThreshold,
-    this.viewFraction = _defaultViewFraction,
+    this.overlayBuilder,
+    this.onSwipeCompleted,
+    this.onWillMoveNext,
+    this.horizontalSwipeThreshold = 0.44,
+    this.verticalSwipeThreshold = 0.32,
+    this.swipeAssistDuration = const Duration(milliseconds: 650),
+    this.viewFraction = 0.92,
+    this.stackClipBehaviour = Clip.hardEdge,
   })  : controller = controller ?? SwipeableStackController(),
+        assert(0 <= viewFraction && viewFraction <= 1),
+        assert(0 <= horizontalSwipeThreshold && horizontalSwipeThreshold <= 1),
+        assert(0 <= verticalSwipeThreshold && verticalSwipeThreshold <= 1),
         super(key: controller?._swipeableStackStateKey);
 
   final SwipeableStackController controller;
   final ValueNotifier<List<T>> dataSet;
   final SwipeableStackItemBuilder<T> builder;
+  final SwipeableStackOverlayBuilder<T>? overlayBuilder;
+  final SwipeCompletionCallback? onSwipeCompleted;
+  final OnWillMoveNext<T>? onWillMoveNext;
   final double viewFraction;
-
   final double horizontalSwipeThreshold;
-
   final double verticalSwipeThreshold;
-
-  static const double _defaultHorizontalSwipeThreshold = 0.44;
-  static const double _defaultVerticalSwipeThreshold = 0.32;
-  static const double _defaultViewFraction = 0.92;
-
-  static const _defaultRewindDuration = Duration(milliseconds: 650);
-
-  static const _defaultSwipeAssistDuration = Duration(milliseconds: 650);
-
-  static const _defaultStackClipBehaviour = Clip.hardEdge;
+  final Duration swipeAssistDuration;
+  final Clip stackClipBehaviour;
 
   @override
   _SwipeableStackState<T> createState() => _SwipeableStackState<T>();
@@ -251,25 +285,27 @@ class _SwipeableStackState<T extends Identifiable>
         .map((data) => CardProperty<T>(data: data))
         .toList();
     widget.dataSet.addListener(
-      () {
-        final newCardProperties = widget.dataSet.value
-            .map((data) => CardProperty<T>(data: data))
-            .toList();
-        final removed = _oldCardProperties.removedDifference(
-          newData: newCardProperties,
-        );
-        final added = _oldCardProperties.addedDifference(
-          newData: newCardProperties,
-        );
-        for (final item in removed) {
-          _oldCardProperties.removeWhere((element) => element.id == item.id);
-        }
-        for (final item in added) {
-          _oldCardProperties.add(item);
-        }
-        setState(() {});
-      },
+      _arrangeCardProperties,
     );
+  }
+
+  void _arrangeCardProperties() {
+    final newCardProperties = widget.dataSet.value
+        .map((data) => CardProperty<T>(data: data))
+        .toList();
+    final removed = _oldCardProperties.removedDifference(
+      newData: newCardProperties,
+    );
+    final added = _oldCardProperties.addedDifference(
+      newData: newCardProperties,
+    );
+    for (final item in removed) {
+      _oldCardProperties.removeWhere((element) => element.id == item.id);
+    }
+    for (final item in added) {
+      _oldCardProperties.add(item);
+    }
+    setState(() {});
   }
 
   @override
@@ -278,8 +314,109 @@ class _SwipeableStackState<T extends Identifiable>
     _swipeAnimationController.dispose();
     _swipeAssistController.dispose();
     _rewindAnimationController.dispose();
-    // TODO(heavenOSK): Remove dataSet listener.
+    widget.dataSet.removeListener(
+      _arrangeCardProperties,
+    );
     super.dispose();
+  }
+
+  double _distanceToAssist({
+    required BuildContext context,
+    required Offset difference,
+    required SwipeDirection swipeDirection,
+  }) {
+    final deviceSize = MediaQuery.of(context).size;
+    if (swipeDirection._isHorizontal) {
+      double _backMoveDistance({
+        required double moveDistance,
+        required double maxWidth,
+        required double maxHeight,
+      }) {
+        final cardAngle = _SwipeablePositioned._calculateAngle(
+          moveDistance,
+          maxWidth,
+        ).abs();
+        return math.cos(math.pi / 2 - cardAngle) * maxHeight;
+      }
+
+      double _remainingDistance({
+        required double moveDistance,
+        required double maxWidth,
+        required double maxHeight,
+      }) {
+        final backMoveDistance = _backMoveDistance(
+          moveDistance: moveDistance,
+          maxHeight: maxHeight,
+          maxWidth: maxWidth,
+        );
+        final diff = maxWidth - (moveDistance - backMoveDistance);
+        return diff < 1
+            ? moveDistance
+            : _remainingDistance(
+                moveDistance: moveDistance + diff,
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+              );
+      }
+
+      final maxWidth = _areConstraints?.maxWidth ?? deviceSize.width;
+      final maxHeight = _areConstraints?.maxHeight ?? deviceSize.height;
+      final maxDistance = _remainingDistance(
+        moveDistance: maxWidth,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+      );
+      return maxDistance - difference.dx.abs();
+    } else {
+      return deviceSize.height - difference.dy.abs();
+    }
+  }
+
+  Offset _offsetToAssist({
+    required Offset difference,
+    required BuildContext context,
+    required SwipeDirection swipeDirection,
+    required double distToAssist,
+  }) {
+    final isHorizontal = swipeDirection._isHorizontal;
+    if (isHorizontal) {
+      final adjustedHorizontally = Offset(difference.dx * 2, difference.dy);
+      final absX = adjustedHorizontally.dx.abs();
+      final rate = distToAssist / absX;
+      return adjustedHorizontally * rate;
+    } else {
+      final adjustedVertically = Offset(difference.dx, difference.dy * 2);
+      final absY = adjustedVertically.dy.abs();
+      final rate = distToAssist / absY;
+      return adjustedVertically * rate;
+    }
+  }
+
+  Duration _getSwipeAssistDuration({
+    required SwipeDirection swipeDirection,
+    required Offset difference,
+    required double distToAssist,
+  }) {
+    final pixelPerMilliseconds = swipeDirection._isHorizontal ? 1.25 : 2.0;
+
+    return Duration(
+      milliseconds: math.min(
+        distToAssist ~/ pixelPerMilliseconds,
+        widget.swipeAssistDuration.inMilliseconds,
+      ),
+    );
+  }
+
+  Duration _getSwipeAnimationDuration({
+    required SwipeDirection swipeDirection,
+    required Offset difference,
+    required double distToAssist,
+  }) {
+    final pixelPerMilliseconds = swipeDirection._isHorizontal ? 1 : 2;
+
+    return Duration(
+      milliseconds: math.min(distToAssist ~/ pixelPerMilliseconds, 650),
+    );
   }
 
   @override
@@ -290,7 +427,6 @@ class _SwipeableStackState<T extends Identifiable>
         _areConstraints = constraints;
         return GestureDetector(
           onPanStart: (d) {
-            print('onPanStart');
             if (!_canSwipe) {
               return;
             }
@@ -309,8 +445,6 @@ class _SwipeableStackState<T extends Identifiable>
             });
           },
           onPanUpdate: (d) {
-            print('onPanUpdate');
-
             if (!_canSwipe) {
               return;
             }
@@ -332,23 +466,41 @@ class _SwipeableStackState<T extends Identifiable>
             });
           },
           onPanEnd: (d) {
-            print('onPanEnd');
-
             if (!_canSwipe) {
               return;
             }
-            // final swipeAssistDirection = _currentSession?.swipeAssistDirection(
-            //   constraints: constraints,
-            //   horizontalSwipeThreshold: widget.horizontalSwipeThreshold,
-            //   verticalSwipeThreshold: widget.verticalSwipeThreshold,
-            // );
+            final swipeAssistDirection =
+                _focusCardDisplayInformation?.swipeAssistDirection(
+              constraints: constraints,
+              horizontalSwipeThreshold: widget.horizontalSwipeThreshold,
+              verticalSwipeThreshold: widget.verticalSwipeThreshold,
+            );
 
-            // if (swipeAssistDirection == null) {
-            _cancelSwipe();
-            // return;
-            // }
+            if (swipeAssistDirection == null) {
+              _cancel();
+              return;
+            }
+
+            bool _allowMoveNext() {
+              final _focusCardProperty = this._focusCardProperty;
+              if (_focusCardProperty == null) {
+                return false;
+              }
+              return widget.onWillMoveNext?.call(
+                    _focusCardProperty.data,
+                    swipeAssistDirection,
+                  ) ??
+                  true;
+            }
+
+            if (!_allowMoveNext()) {
+              _cancel();
+              return;
+            }
+            _swipeNext(swipeAssistDirection);
           },
           child: Stack(
+            clipBehavior: widget.stackClipBehaviour,
             children: _buildCards(
               context,
               constraints,
@@ -381,7 +533,7 @@ class _SwipeableStackState<T extends Identifiable>
         cp.data,
         _areConstraints!,
       );
-      return _SwipablePositioned(
+      return _SwipeablePositioned(
         key: child.key ?? ValueKey(cp.id),
         viewFraction: widget.viewFraction,
         displayInformation: session,
@@ -397,7 +549,154 @@ class _SwipeableStackState<T extends Identifiable>
     }).reversed.toList();
   }
 
-  void _cancelSwipe() {
+  void _swipeNext(SwipeDirection swipeDirection) {
+    if (!_canSwipe) {
+      return;
+    }
+    final _focusCardDisplayInformation = this._focusCardDisplayInformation;
+    final _focusCardProperty = this._focusCardProperty;
+    if (_focusCardDisplayInformation == null || _focusCardProperty == null) {
+      return;
+    }
+    final distToAssist = _distanceToAssist(
+      swipeDirection: swipeDirection,
+      context: context,
+      difference: _focusCardDisplayInformation.difference,
+    );
+    _swipeAssistController.duration = _getSwipeAssistDuration(
+      distToAssist: distToAssist,
+      swipeDirection: swipeDirection,
+      difference: _focusCardDisplayInformation.difference,
+    );
+
+    final animation = _swipeAssistController._swipeAnimation(
+      startPosition: _focusCardDisplayInformation.currentPosition,
+      endPosition: _focusCardDisplayInformation.currentPosition +
+          _offsetToAssist(
+            distToAssist: distToAssist,
+            difference: _focusCardDisplayInformation.difference,
+            context: context,
+            swipeDirection: swipeDirection,
+          ),
+    );
+
+    void animate() {
+      _animatePosition(animation);
+    }
+
+    animation.addListener(animate);
+    _swipeAssistController.forward(from: 0).then(
+      (_) {
+        animation.removeListener(animate);
+        widget.onSwipeCompleted?.call(
+          _focusCardProperty,
+          swipeDirection,
+        );
+        setState(() {
+          _oldCardProperties.judgeWithId(
+            _focusCardProperty.id,
+            isJudged: true,
+            lastCardDisplayInformation: this._focusCardDisplayInformation,
+          );
+          this._focusCardDisplayInformation = null;
+        });
+      },
+    ).catchError((dynamic c) {
+      animation.removeListener(animate);
+      setState(() {
+        this._focusCardDisplayInformation = null;
+      });
+    });
+  }
+
+  void _next({
+    required SwipeDirection swipeDirection,
+    required bool shouldCallCompletionCallback,
+    required bool ignoreOnWillMoveNext,
+    Duration? duration,
+  }) {
+    if (!_canAnimationStart) {
+      return;
+    }
+    final _focusCardProperty = this._focusCardProperty;
+    if (_focusCardProperty == null) {
+      return;
+    }
+
+    bool allowMoveNext() {
+      if (ignoreOnWillMoveNext) {
+        return true;
+      }
+      final onWillMoveNext = widget.onWillMoveNext;
+      if (onWillMoveNext == null) {
+        return true;
+      }
+      return onWillMoveNext(
+        _focusCardProperty.data,
+        swipeDirection,
+      );
+    }
+
+    if (!allowMoveNext()) {
+      return;
+    }
+
+    final startPosition = CardDisplayInformation.notMoving();
+    setState(() {
+      _focusCardDisplayInformation = startPosition;
+    });
+    final distToAssist = _distanceToAssist(
+      swipeDirection: swipeDirection,
+      context: context,
+      difference: startPosition.difference,
+    );
+    _swipeAnimationController.duration = duration ??
+        _getSwipeAnimationDuration(
+          distToAssist: distToAssist,
+          swipeDirection: swipeDirection,
+          difference: startPosition.difference,
+        );
+
+    final animation = _swipeAnimationController._swipeAnimation(
+      startPosition: startPosition.currentPosition,
+      endPosition: _offsetToAssist(
+        distToAssist: distToAssist,
+        difference: swipeDirection._defaultOffset,
+        context: context,
+        swipeDirection: swipeDirection,
+      ),
+    );
+
+    void animate() {
+      _animatePosition(animation);
+    }
+
+    animation.addListener(animate);
+    _swipeAnimationController.forward(from: 0).then(
+      (_) {
+        if (shouldCallCompletionCallback) {
+          widget.onSwipeCompleted?.call(
+            _focusCardProperty.data,
+            swipeDirection,
+          );
+        }
+        animation.removeListener(animate);
+        setState(() {
+          _oldCardProperties.judgeWithId(
+            _focusCardProperty.id,
+            isJudged: true,
+            lastCardDisplayInformation:
+                this._focusCardDisplayInformation?.clone(),
+          );
+          this._focusCardDisplayInformation = null;
+        });
+      },
+    ).catchError((dynamic c) {
+      animation.removeListener(animate);
+    });
+  }
+
+  void _cancel() {
     final _focusCardDisplayInformation = this._focusCardDisplayInformation;
     if (_focusCardDisplayInformation == null) {
       return;
@@ -414,10 +713,15 @@ class _SwipeableStackState<T extends Identifiable>
     _swipeCancelAnimationController.forward(from: 0).then(
       (_) {
         cancelAnimation.removeListener(_animate);
-        _resetDisplayInformation();
+        setState(() {
+          this._focusCardDisplayInformation = null;
+        });
       },
     ).catchError((dynamic c) {
       cancelAnimation.removeListener(_animate);
+      setState(() {
+        this._focusCardDisplayInformation = null;
+      });
     });
   }
 
@@ -429,44 +733,63 @@ class _SwipeableStackState<T extends Identifiable>
     });
   }
 
-  void _resetDisplayInformation() {
-    setState(() {
-      _focusCardDisplayInformation = null;
-    });
-  }
-
-  void _moveFocusForward() {
-    final _focusIndex = this._focusIndex;
-    if (_focusIndex == null) {
+  void _rewind({
+    required Duration duration,
+  }) {
+    if (!_canAnimationStart) {
       return;
     }
-    _oldCardProperties.replaceAt(
-      _focusIndex,
-      replacement: _oldCardProperties[_focusIndex].copyWith(
-        isJudged: true,
-      ),
-    );
-    setState(() {});
-  }
-
-  void _moveFocusBack() {
     final focusIndex = _focusIndex ?? _oldCardProperties.length;
-    final nextIndex = focusIndex - 1;
-    if (nextIndex < 0) {
+    final targetIndex = focusIndex - 1;
+    if (targetIndex < 0) {
       return;
     }
-    _oldCardProperties.replaceAt(
-      nextIndex,
-      replacement: _oldCardProperties[nextIndex].copyWith(
+    void _prepareRewind() {
+      final targetCardProperty = _oldCardProperties[targetIndex];
+      this._focusCardDisplayInformation =
+          targetCardProperty.lastDisplayInformation?.clone();
+      _oldCardProperties.judgeWithId(
+        targetCardProperty.id,
         isJudged: false,
-      ),
+        lastCardDisplayInformation: null,
+      );
+      setState(() {});
+    }
+
+    _prepareRewind();
+
+    final _focusCardDisplayInformation = this._focusCardDisplayInformation;
+    if (_focusCardDisplayInformation == null) {
+      return;
+    }
+    _rewindAnimationController.duration = duration;
+    final rewindAnimation = _rewindAnimationController._cancelAnimation(
+      startPosition: _focusCardDisplayInformation.startPosition,
+      currentPosition: _focusCardDisplayInformation.currentPosition,
     );
-    setState(() {});
+    void _animate() {
+      _animatePosition(rewindAnimation);
+    }
+
+    rewindAnimation.addListener(_animate);
+    _rewindAnimationController.forward(from: 0).then(
+      (_) {
+        rewindAnimation.removeListener(_animate);
+        setState(() {
+          this._focusCardDisplayInformation = null;
+        });
+      },
+    ).catchError((dynamic c) {
+      rewindAnimation.removeListener(_animate);
+      setState(() {
+        this._focusCardDisplayInformation = null;
+      });
+    });
   }
 }
 
-class _SwipablePositioned extends StatelessWidget {
-  const _SwipablePositioned({
+class _SwipeablePositioned extends StatelessWidget {
+  const _SwipeablePositioned({
     required this.index,
     CardDisplayInformation? displayInformation,
     required this.areaConstraints,
