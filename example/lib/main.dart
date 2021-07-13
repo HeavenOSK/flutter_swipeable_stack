@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:example/card_data.dart';
 import 'package:flutter/material.dart';
 import 'package:swipeable_stack/swipeable_stack.dart';
+
+import 'card_label.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -92,36 +96,67 @@ class _HomeState extends State<Home> {
                       child: Padding(
                         padding: const EdgeInsets.all(8),
                         child: SwipeableStack<CardData>(
+                          stackClipBehaviour: Clip.none,
                           controller: _controller,
                           dataSet: _cards,
+                          overlayBuilder: (
+                            context,
+                            constraints,
+                            data,
+                            direction,
+                            swipeProgress,
+                          ) {
+                            final opacity = math.min<double>(swipeProgress, 1);
+
+                            final isRight = direction == SwipeDirection.right;
+                            final isLeft = direction == SwipeDirection.left;
+                            final isUp = direction == SwipeDirection.up;
+                            final isDown = direction == SwipeDirection.down;
+                            return Padding(
+                              padding: const EdgeInsets.all(48),
+                              child: Stack(
+                                children: [
+                                  Opacity(
+                                    opacity: isRight ? opacity : 0,
+                                    child: CardLabel.right(),
+                                  ),
+                                  Opacity(
+                                    opacity: isLeft ? opacity : 0,
+                                    child: CardLabel.left(),
+                                  ),
+                                  Opacity(
+                                    opacity: isUp ? opacity : 0,
+                                    child: CardLabel.up(),
+                                  ),
+                                  Opacity(
+                                    opacity: isDown ? opacity : 0,
+                                    child: CardLabel.down(),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                           builder: (context, data, constraints) {
                             return Center(
                               child: ConstrainedBox(
                                 constraints: constraints,
-                                child: Stack(
-                                  children: [
-                                    Center(
-                                      child: Image.asset(
-                                        data.path,
-                                        height: constraints.maxHeight,
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Container(
-                                        width: 64,
-                                        height: 64,
-                                        alignment: Alignment.center,
-                                        color: data.color,
-                                        child: Text(
-                                          'id: ${data.id}',
-                                          style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                child: Center(
+                                  child: Stack(
+                                    children: [
+                                      Positioned.fill(
+                                        child: Image.asset(
+                                          data.path,
+                                          height: constraints.maxHeight,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      Center(
+                                        child: CircleAvatar(
+                                          backgroundColor: Colors.green,
+                                          child: Text(data.id),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
@@ -171,10 +206,31 @@ class _HomeState extends State<Home> {
                         ),
                         _button(
                           onPressed: () => _controller.next(
+                            swipeDirection: SwipeDirection.down,
+                          ),
+                          color: Colors.red,
+                          label: 'down',
+                        ),
+                        _button(
+                          onPressed: () => _controller.next(
+                            swipeDirection: SwipeDirection.left,
+                          ),
+                          color: Colors.red,
+                          label: 'left',
+                        ),
+                        _button(
+                          onPressed: () => _controller.next(
+                            swipeDirection: SwipeDirection.up,
+                          ),
+                          color: Colors.red,
+                          label: 'up',
+                        ),
+                        _button(
+                          onPressed: () => _controller.next(
                             swipeDirection: SwipeDirection.right,
                           ),
-                          color: Colors.pink,
-                          label: 'next',
+                          color: Colors.red,
+                          label: 'right',
                         ),
                       ],
                     ),

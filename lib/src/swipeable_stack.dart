@@ -17,7 +17,6 @@ enum SwipeDirection {
 class SwipeableStackController {
   SwipeableStackController();
 
-  /// The key for [SwipableStack] to control.
   final _swipeableStackStateKey = GlobalKey<_SwipeableStackState>();
 
   void next({
@@ -43,7 +42,7 @@ class SwipeableStackController {
   }
 }
 
-extension CardPropertiesX<T extends Identifiable> on List<CardProperty<T>> {
+extension _CardPropertiesX<T extends Identifiable> on List<CardProperty<T>> {
   void _replaceAt(
     int index, {
     required CardProperty<T> replacement,
@@ -244,6 +243,15 @@ class _SwipeableStackState<T extends Identifiable>
     );
   }
 
+  CardProperty<T>? get _rewindTarget {
+    final focusIndex = _focusIndex ?? _oldCardProperties.length;
+    final targetIndex = focusIndex - 1;
+    if (targetIndex < 0) {
+      return null;
+    }
+    return _oldCardProperties[targetIndex];
+  }
+
   late final AnimationController _swipeCancelAnimationController =
       AnimationController(
     vsync: this,
@@ -264,6 +272,8 @@ class _SwipeableStackState<T extends Identifiable>
   late final AnimationController _swipeAssistController = AnimationController(
     vsync: this,
   );
+
+  bool get _rewinding => _rewindAnimationController._animating;
 
   bool get _canSwipe =>
       !_swipeAssistController._animating &&
@@ -300,7 +310,9 @@ class _SwipeableStackState<T extends Identifiable>
       newData: newCardProperties,
     );
     for (final item in removed) {
-      _oldCardProperties.removeWhere((element) => element.id == item.id);
+      _oldCardProperties.removeWhere(
+        (cp) => cp.id == item.id,
+      );
     }
     for (final item in added) {
       _oldCardProperties.add(item);
@@ -526,7 +538,7 @@ class _SwipeableStackState<T extends Identifiable>
   List<Widget> _buildCards(BuildContext context, BoxConstraints constraints) {
     final session =
         _focusCardDisplayInformation ?? CardDisplayInformation.notMoving();
-    return List.generate(_visibleCardProperties.length, (index) {
+    final cards = List<Widget>.generate(_visibleCardProperties.length, (index) {
       final cp = _visibleCardProperties[index];
       final child = widget.builder(
         context,
@@ -547,6 +559,89 @@ class _SwipeableStackState<T extends Identifiable>
         child: child,
       );
     }).reversed.toList();
+
+    final overlay = _buildOverlay(
+      constraints: constraints,
+    );
+    if (overlay != null) {
+      cards.add(overlay);
+    }
+
+    // Stand by for rewinding.
+    final rewindTargetCard = _rewindTargetCard(
+      constraints: constraints,
+    );
+    if (rewindTargetCard != null) {
+      cards.add(rewindTargetCard);
+    }
+    return cards;
+  }
+
+  Widget? _rewindTargetCard({
+    required BoxConstraints constraints,
+  }) {
+    final _rewindTarget = this._rewindTarget;
+    if (_rewindTarget == null) {
+      return null;
+    }
+    final lastDisplayInformation = _rewindTarget.lastDisplayInformation;
+    if (lastDisplayInformation == null) {
+      return null;
+    }
+    final child = widget.builder(
+      context,
+      _rewindTarget.data,
+      _areConstraints!,
+    );
+    return _SwipeablePositioned(
+      key: child.key ?? ValueKey(_rewindTarget.id),
+      viewFraction: widget.viewFraction,
+      displayInformation: lastDisplayInformation,
+      swipeDirectionRate: lastDisplayInformation.swipeDirectionRate(
+        constraints: constraints,
+        horizontalSwipeThreshold: widget.horizontalSwipeThreshold,
+        verticalSwipeThreshold: widget.verticalSwipeThreshold,
+      ),
+      index: 0,
+      areaConstraints: constraints,
+      child: child,
+    );
+  }
+
+  Widget? _buildOverlay({
+    required BoxConstraints constraints,
+  }) {
+    if (_rewinding) {
+      return null;
+    }
+    final _focusCardProperty = this._focusCardProperty;
+    final swipeDirectionRate = _focusCardDisplayInformation?.swipeDirectionRate(
+      constraints: constraints,
+      horizontalSwipeThreshold: widget.horizontalSwipeThreshold,
+      verticalSwipeThreshold: widget.verticalSwipeThreshold,
+    );
+    if (swipeDirectionRate == null || _focusCardProperty == null) {
+      return null;
+    }
+    final overlay = widget.overlayBuilder?.call(
+      context,
+      constraints,
+      _focusCardProperty.data,
+      swipeDirectionRate.direction,
+      swipeDirectionRate.rate,
+    );
+    if (overlay == null) {
+      return null;
+    }
+    final displayInformation =
+        _focusCardDisplayInformation ?? CardDisplayInformation.notMoving();
+    return _SwipeablePositioned.overlay(
+      viewFraction: widget.viewFraction,
+      displayInformation: displayInformation,
+      swipeDirectionRate: swipeDirectionRate,
+      areaConstraints: constraints,
+      child: overlay,
+    );
   }
 
   void _swipeNext(SwipeDirection swipeDirection) {
@@ -596,7 +691,8 @@ class _SwipeableStackState<T extends Identifiable>
           _oldCardProperties.judgeWithId(
             _focusCardProperty.id,
             isJudged: true,
-            lastCardDisplayInformation: this._focusCardDisplayInformation,
+            lastCardDisplayInformation:
+                this._focusCardDisplayInformation?.cloned(),
           );
           this._focusCardDisplayInformation = null;
         });
@@ -686,7 +782,7 @@ class _SwipeableStackState<T extends Identifiable>
             _focusCardProperty.id,
             isJudged: true,
             lastCardDisplayInformation:
-                this._focusCardDisplayInformation?.clone(),
+                this._focusCardDisplayInformation?.cloned(),
           );
           this._focusCardDisplayInformation = null;
         });
@@ -739,17 +835,15 @@ class _SwipeableStackState<T extends Identifiable>
     if (!_canAnimationStart) {
       return;
     }
-    final focusIndex = _focusIndex ?? _oldCardProperties.length;
-    final targetIndex = focusIndex - 1;
-    if (targetIndex < 0) {
+    final _rewindTarget = this._rewindTarget;
+    if (_rewindTarget == null) {
       return;
     }
     void _prepareRewind() {
-      final targetCardProperty = _oldCardProperties[targetIndex];
       this._focusCardDisplayInformation =
-          targetCardProperty.lastDisplayInformation?.clone();
+          _rewindTarget.lastDisplayInformation?.cloned();
       _oldCardProperties.judgeWithId(
-        targetCardProperty.id,
+        _rewindTarget.id,
         isJudged: false,
         lastCardDisplayInformation: null,
       );
@@ -800,6 +894,26 @@ class _SwipeablePositioned extends StatelessWidget {
   })  : _displayInformation = displayInformation,
         assert(0 <= viewFraction && viewFraction <= 1),
         super(key: key);
+
+  static Widget overlay({
+    required CardDisplayInformation? displayInformation,
+    required BoxConstraints areaConstraints,
+    required Widget child,
+    required _SwipeRatePerThreshold swipeDirectionRate,
+    required double viewFraction,
+  }) {
+    return _SwipeablePositioned(
+      key: const ValueKey('overlay'),
+      displayInformation: displayInformation,
+      index: 0,
+      viewFraction: viewFraction,
+      areaConstraints: areaConstraints,
+      swipeDirectionRate: swipeDirectionRate,
+      child: IgnorePointer(
+        child: child,
+      ),
+    );
+  }
 
   final int index;
   final CardDisplayInformation? _displayInformation;

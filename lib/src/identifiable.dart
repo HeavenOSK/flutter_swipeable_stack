@@ -1,5 +1,3 @@
-import 'package:collection/collection.dart';
-
 abstract class Identifiable {
   String get id;
 
@@ -26,8 +24,4 @@ extension DifferenceX on List<Identifiable> {
     final newDataSet = Set<T>.from(newData);
     return oldDataSet.difference(newDataSet);
   }
-
-  Identifiable? get(String id) => this.firstWhereOrNull(
-        (element) => element.id == id,
-      );
 }
