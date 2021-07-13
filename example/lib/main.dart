@@ -37,7 +37,7 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  late final _controller = SwipeableStackController();
+  late final _controller = SwipeableStackController<CardData>();
   late final _cards = ValueNotifier<List<CardData>>(
     CardData.initialDeck(),
   );
