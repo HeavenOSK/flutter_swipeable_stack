@@ -14,10 +14,85 @@ enum SwipeDirection {
   down,
 }
 
-class SwipeableStackController {
+class SwipeableStackController<T extends SwipeableStackIdentifiable>
+    extends ChangeNotifier {
   SwipeableStackController();
 
   final _swipeableStackStateKey = GlobalKey<_SwipeableStackState>();
+
+  var _cardProperties = <CardProperty<T>>[];
+
+  int get size => _cardProperties.length;
+
+  T? get currentData => _focusCardProperty?.data;
+
+  int? get currentIndex => _focusIndex;
+
+  List<CardProperty<T>> get _visibleCardProperties {
+    final notJudgedCardProperties =
+        _cardProperties.where((element) => !element.isJudged).toList();
+    return notJudgedCardProperties.sublist(
+      0,
+      math.min(3, notJudgedCardProperties.length),
+    );
+  }
+
+  CardProperty<T>? get _focusCardProperty =>
+      _visibleCardProperties.isNotEmpty ? _visibleCardProperties.first : null;
+
+  int? get _focusIndex {
+    final focusId = _focusCardProperty?.id;
+    if (focusId == null) {
+      return null;
+    }
+    return _cardProperties.indexWhere(
+      (cp) => cp.id == focusId,
+    );
+  }
+
+  CardProperty<T>? get _rewindTarget {
+    final focusIndex = _focusIndex ?? _cardProperties.length;
+    final targetIndex = focusIndex - 1;
+    if (targetIndex < 0) {
+      return null;
+    }
+    return _cardProperties[targetIndex];
+  }
+
+  void _arrangeCardProperties({
+    required List<T> newDataSet,
+  }) {
+    final newCardProperties =
+        newDataSet.map((data) => CardProperty<T>(data: data)).toList();
+    final removed = _cardProperties.removedDifference(
+      newData: newCardProperties,
+    );
+    final added = _cardProperties.addedDifference(
+      newData: newCardProperties,
+    );
+    for (final item in removed) {
+      _cardProperties.removeWhere(
+        (cp) => cp.id == item.id,
+      );
+    }
+    for (final item in added) {
+      _cardProperties.add(item);
+    }
+    notifyListeners();
+  }
+
+  void _judge({
+    required String targetId,
+    required bool isJudged,
+    required CardDisplayInformation? lastCardDisplayInformation,
+  }) {
+    _cardProperties.judgeWithId(
+      targetId,
+      isJudged: isJudged,
+      lastCardDisplayInformation: lastCardDisplayInformation,
+    );
+    notifyListeners();
+  }
 
   void next({
     required SwipeDirection swipeDirection,
@@ -42,7 +117,8 @@ class SwipeableStackController {
   }
 }
 
-extension _CardPropertiesX<T extends Identifiable> on List<CardProperty<T>> {
+extension _CardPropertiesX<T extends SwipeableStackIdentifiable>
+    on List<CardProperty<T>> {
   void _replaceAt(
     int index, {
     required CardProperty<T> replacement,
@@ -180,9 +256,10 @@ extension _SwipeSessionX on CardDisplayInformation {
   }
 }
 
-class SwipeableStack<T extends Identifiable> extends StatefulWidget {
+class SwipeableStack<T extends SwipeableStackIdentifiable>
+    extends StatefulWidget {
   SwipeableStack({
-    SwipeableStackController? controller,
+    SwipeableStackController<T>? controller,
     required this.dataSet,
     required this.builder,
     this.overlayBuilder,
@@ -193,13 +270,13 @@ class SwipeableStack<T extends Identifiable> extends StatefulWidget {
     this.swipeAssistDuration = const Duration(milliseconds: 650),
     this.viewFraction = 0.92,
     this.stackClipBehaviour = Clip.hardEdge,
-  })  : controller = controller ?? SwipeableStackController(),
+  })  : controller = controller ?? SwipeableStackController<T>(),
         assert(0 <= viewFraction && viewFraction <= 1),
         assert(0 <= horizontalSwipeThreshold && horizontalSwipeThreshold <= 1),
         assert(0 <= verticalSwipeThreshold && verticalSwipeThreshold <= 1),
         super(key: controller?._swipeableStackStateKey);
 
-  final SwipeableStackController controller;
+  final SwipeableStackController<T> controller;
   final ValueNotifier<List<T>> dataSet;
   final SwipeableStackItemBuilder<T> builder;
   final SwipeableStackOverlayBuilder<T>? overlayBuilder;
@@ -215,42 +292,9 @@ class SwipeableStack<T extends Identifiable> extends StatefulWidget {
   _SwipeableStackState<T> createState() => _SwipeableStackState<T>();
 }
 
-class _SwipeableStackState<T extends Identifiable>
+class _SwipeableStackState<T extends SwipeableStackIdentifiable>
     extends State<SwipeableStack<T>> with TickerProviderStateMixin {
-  late final List<CardProperty<T>> _oldCardProperties;
-
-  List<CardProperty<T>> get _visibleCardProperties {
-    final notJudgedCardProperties =
-        _oldCardProperties.where((element) => !element.isJudged).toList();
-    return notJudgedCardProperties.sublist(
-      0,
-      math.min(3, notJudgedCardProperties.length),
-    );
-  }
-
-  CardProperty<T>? get _focusCardProperty =>
-      _visibleCardProperties.isNotEmpty ? _visibleCardProperties.first : null;
-
-  CardDisplayInformation? _focusCardDisplayInformation;
-
-  int? get _focusIndex {
-    final focusId = _focusCardProperty?.id;
-    if (focusId == null) {
-      return null;
-    }
-    return _oldCardProperties.indexWhere(
-      (cp) => cp.id == focusId,
-    );
-  }
-
-  CardProperty<T>? get _rewindTarget {
-    final focusIndex = _focusIndex ?? _oldCardProperties.length;
-    final targetIndex = focusIndex - 1;
-    if (targetIndex < 0) {
-      return null;
-    }
-    return _oldCardProperties[targetIndex];
-  }
+  late final SwipeableStackController<T> _controller = widget.controller;
 
   late final AnimationController _swipeCancelAnimationController =
       AnimationController(
@@ -286,38 +330,24 @@ class _SwipeableStackState<T extends Identifiable>
       !_swipeCancelAnimationController._animating &&
       !_rewindAnimationController._animating;
 
+  CardDisplayInformation? _focusCardDisplayInformation;
   BoxConstraints? _areConstraints;
 
   @override
   void initState() {
     super.initState();
-    _oldCardProperties = widget.dataSet.value
+    _controller._cardProperties = widget.dataSet.value
         .map((data) => CardProperty<T>(data: data))
         .toList();
     widget.dataSet.addListener(
-      _arrangeCardProperties,
+      _notifyNewCards,
     );
   }
 
-  void _arrangeCardProperties() {
-    final newCardProperties = widget.dataSet.value
-        .map((data) => CardProperty<T>(data: data))
-        .toList();
-    final removed = _oldCardProperties.removedDifference(
-      newData: newCardProperties,
+  void _notifyNewCards() {
+    _controller._arrangeCardProperties(
+      newDataSet: widget.dataSet.value,
     );
-    final added = _oldCardProperties.addedDifference(
-      newData: newCardProperties,
-    );
-    for (final item in removed) {
-      _oldCardProperties.removeWhere(
-        (cp) => cp.id == item.id,
-      );
-    }
-    for (final item in added) {
-      _oldCardProperties.add(item);
-    }
-    setState(() {});
   }
 
   @override
@@ -327,7 +357,7 @@ class _SwipeableStackState<T extends Identifiable>
     _swipeAssistController.dispose();
     _rewindAnimationController.dispose();
     widget.dataSet.removeListener(
-      _arrangeCardProperties,
+      _notifyNewCards,
     );
     super.dispose();
   }
@@ -494,7 +524,7 @@ class _SwipeableStackState<T extends Identifiable>
             }
 
             bool _allowMoveNext() {
-              final _focusCardProperty = this._focusCardProperty;
+              final _focusCardProperty = _controller._focusCardProperty;
               if (_focusCardProperty == null) {
                 return false;
               }
@@ -538,8 +568,9 @@ class _SwipeableStackState<T extends Identifiable>
   List<Widget> _buildCards(BuildContext context, BoxConstraints constraints) {
     final session =
         _focusCardDisplayInformation ?? CardDisplayInformation.notMoving();
-    final cards = List<Widget>.generate(_visibleCardProperties.length, (index) {
-      final cp = _visibleCardProperties[index];
+    final cards = List<Widget>.generate(
+        _controller._visibleCardProperties.length, (index) {
+      final cp = _controller._visibleCardProperties[index];
       final child = widget.builder(
         context,
         cp.data,
@@ -580,7 +611,7 @@ class _SwipeableStackState<T extends Identifiable>
   Widget? _rewindTargetCard({
     required BoxConstraints constraints,
   }) {
-    final _rewindTarget = this._rewindTarget;
+    final _rewindTarget = _controller._rewindTarget;
     if (_rewindTarget == null) {
       return null;
     }
@@ -614,7 +645,7 @@ class _SwipeableStackState<T extends Identifiable>
     if (_rewinding) {
       return null;
     }
-    final _focusCardProperty = this._focusCardProperty;
+    final _focusCardProperty = _controller._focusCardProperty;
     final swipeDirectionRate = _focusCardDisplayInformation?.swipeDirectionRate(
       constraints: constraints,
       horizontalSwipeThreshold: widget.horizontalSwipeThreshold,
@@ -649,7 +680,7 @@ class _SwipeableStackState<T extends Identifiable>
       return;
     }
     final _focusCardDisplayInformation = this._focusCardDisplayInformation;
-    final _focusCardProperty = this._focusCardProperty;
+    final _focusCardProperty = _controller._focusCardProperty;
     if (_focusCardDisplayInformation == null || _focusCardProperty == null) {
       return;
     }
@@ -687,15 +718,13 @@ class _SwipeableStackState<T extends Identifiable>
           _focusCardProperty,
           swipeDirection,
         );
-        setState(() {
-          _oldCardProperties.judgeWithId(
-            _focusCardProperty.id,
-            isJudged: true,
-            lastCardDisplayInformation:
-                this._focusCardDisplayInformation?.cloned(),
-          );
-          this._focusCardDisplayInformation = null;
-        });
+        final cloned = this._focusCardDisplayInformation?.cloned();
+        this._focusCardDisplayInformation = null;
+        _controller._judge(
+          targetId: _focusCardProperty.id,
+          isJudged: true,
+          lastCardDisplayInformation: cloned,
+        );
       },
     ).catchError((dynamic c) {
       animation.removeListener(animate);
@@ -714,7 +743,7 @@ class _SwipeableStackState<T extends Identifiable>
     if (!_canAnimationStart) {
       return;
     }
-    final _focusCardProperty = this._focusCardProperty;
+    final _focusCardProperty = _controller._focusCardProperty;
     if (_focusCardProperty == null) {
       return;
     }
@@ -777,15 +806,13 @@ class _SwipeableStackState<T extends Identifiable>
           );
         }
         animation.removeListener(animate);
-        setState(() {
-          _oldCardProperties.judgeWithId(
-            _focusCardProperty.id,
-            isJudged: true,
-            lastCardDisplayInformation:
-                this._focusCardDisplayInformation?.cloned(),
-          );
-          this._focusCardDisplayInformation = null;
-        });
+        final cloned = this._focusCardDisplayInformation?.cloned();
+        this._focusCardDisplayInformation = null;
+        _controller._judge(
+          targetId: _focusCardProperty.id,
+          isJudged: true,
+          lastCardDisplayInformation: cloned,
+        );
       },
     ).catchError((dynamic c) {
       animation.removeListener(animate);
@@ -835,15 +862,15 @@ class _SwipeableStackState<T extends Identifiable>
     if (!_canAnimationStart) {
       return;
     }
-    final _rewindTarget = this._rewindTarget;
+    final _rewindTarget = _controller._rewindTarget;
     if (_rewindTarget == null) {
       return;
     }
     void _prepareRewind() {
       this._focusCardDisplayInformation =
           _rewindTarget.lastDisplayInformation?.cloned();
-      _oldCardProperties.judgeWithId(
-        _rewindTarget.id,
+      _controller._judge(
+        targetId: _rewindTarget.id,
         isJudged: false,
         lastCardDisplayInformation: null,
       );

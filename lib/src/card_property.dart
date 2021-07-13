@@ -1,7 +1,8 @@
 import 'package:swipeable_stack/src/card_display_information.dart';
 import 'package:swipeable_stack/src/identifiable.dart';
 
-class CardProperty<T extends Identifiable> extends Identifiable {
+class CardProperty<T extends SwipeableStackIdentifiable>
+    extends SwipeableStackIdentifiable {
   CardProperty({
     required this.data,
     this.lastDisplayInformation,

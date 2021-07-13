@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:swipeable_stack/swipeable_stack.dart';
 
-class CardData extends Identifiable {
+class CardData extends SwipeableStackIdentifiable {
   CardData({
     required this.id,
     required this.path,
