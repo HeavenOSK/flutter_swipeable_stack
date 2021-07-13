@@ -4,13 +4,13 @@ import 'package:swipeable_stack/src/identifiable.dart';
 class CardProperty<T extends Identifiable> extends Identifiable {
   CardProperty({
     required this.data,
-    this.displayInformation,
+    this.lastDisplayInformation,
     this.isJudged = false,
   });
 
   final T data;
   final bool isJudged;
-  final CardDisplayInformation? displayInformation;
+  final CardDisplayInformation? lastDisplayInformation;
 
   @override
   String get id => data.id;
@@ -23,7 +23,7 @@ class CardProperty<T extends Identifiable> extends Identifiable {
     return CardProperty(
       data: data ?? this.data,
       isJudged: isJudged ?? this.isJudged,
-      displayInformation: displayInformation ?? this.displayInformation,
+      lastDisplayInformation: displayInformation ?? this.lastDisplayInformation,
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:swipeable_stack/src/card_display_information.dart';
 import 'package:swipeable_stack/src/card_property.dart';
 
 import 'identifiable.dart';
@@ -27,6 +28,120 @@ class SwipeableStackController {
   }
 }
 
+extension _ReplaceAt<E> on List<E> {
+  void replaceAt(
+    int index, {
+    required E replacement,
+  }) =>
+      this.replaceRange(index, index + 1, [replacement]);
+}
+
+class _SwipeRatePerThreshold {
+  _SwipeRatePerThreshold({
+    required this.direction,
+    required this.rate,
+  }) : assert(rate >= 0);
+
+  final SwipeDirection direction;
+  final double rate;
+}
+
+extension _SwipeDirectionX on SwipeDirection {
+  Offset get _defaultOffset {
+    switch (this) {
+      case SwipeDirection.left:
+        return const Offset(-1, 0);
+      case SwipeDirection.right:
+        return const Offset(1, 0);
+      case SwipeDirection.up:
+        return const Offset(0, -1);
+      case SwipeDirection.down:
+        return const Offset(0, 1);
+    }
+  }
+
+  bool get _isHorizontal =>
+      this == SwipeDirection.right || this == SwipeDirection.left;
+}
+
+extension _AnimationControllerX on AnimationController {
+  bool get _animating =>
+      status == AnimationStatus.forward || status == AnimationStatus.reverse;
+
+  Animation<Offset> _cancelAnimation({
+    required Offset startPosition,
+    required Offset currentPosition,
+  }) {
+    return Tween<Offset>(
+      begin: currentPosition,
+      end: startPosition,
+    ).animate(
+      CurvedAnimation(
+        parent: this,
+        curve: const ElasticOutCurve(0.95),
+      ),
+    );
+  }
+
+  Animation<Offset> _swipeAnimation({
+    required Offset startPosition,
+    required Offset endPosition,
+  }) {
+    return Tween<Offset>(
+      begin: startPosition,
+      end: endPosition,
+    ).animate(
+      CurvedAnimation(
+        parent: this,
+        curve: const Cubic(0.7, 1, 0.73, 1),
+      ),
+    );
+  }
+}
+
+extension _SwipeSessionX on CardDisplayInformation {
+  _SwipeRatePerThreshold swipeDirectionRate({
+    required BoxConstraints constraints,
+    required double horizontalSwipeThreshold,
+    required double verticalSwipeThreshold,
+  }) {
+    final horizontalRate = (difference.dx.abs() / constraints.maxWidth) /
+        (horizontalSwipeThreshold / 2);
+    final verticalRate = (difference.dy.abs() / constraints.maxHeight) /
+        (verticalSwipeThreshold / 2);
+    final horizontalRateGreater = horizontalRate >= verticalRate;
+    if (horizontalRateGreater) {
+      return _SwipeRatePerThreshold(
+        direction:
+            difference.dx >= 0 ? SwipeDirection.right : SwipeDirection.left,
+        rate: horizontalRate,
+      );
+    } else {
+      return _SwipeRatePerThreshold(
+        direction: difference.dy >= 0 ? SwipeDirection.down : SwipeDirection.up,
+        rate: verticalRate,
+      );
+    }
+  }
+
+  SwipeDirection? swipeAssistDirection({
+    required BoxConstraints constraints,
+    required double horizontalSwipeThreshold,
+    required double verticalSwipeThreshold,
+  }) {
+    final directionRate = swipeDirectionRate(
+      constraints: constraints,
+      horizontalSwipeThreshold: horizontalSwipeThreshold,
+      verticalSwipeThreshold: verticalSwipeThreshold,
+    );
+    if (directionRate.rate < 1) {
+      return null;
+    } else {
+      return directionRate.direction;
+    }
+  }
+}
+
 typedef SwipeableStackItemBuilder<T extends Identifiable> = Widget Function(
   BuildContext context,
   T data,
@@ -38,13 +153,30 @@ class SwipeableStack<T extends Identifiable> extends StatefulWidget {
     SwipeableStackController? controller,
     required this.dataSet,
     required this.builder,
-    Key? key,
+    this.horizontalSwipeThreshold = _defaultHorizontalSwipeThreshold,
+    this.verticalSwipeThreshold = _defaultVerticalSwipeThreshold,
+    this.viewFraction = _defaultViewFraction,
   })  : controller = controller ?? SwipeableStackController(),
         super(key: controller?._swipeableStackStateKey);
 
   final SwipeableStackController controller;
   final ValueNotifier<List<T>> dataSet;
   final SwipeableStackItemBuilder<T> builder;
+  final double viewFraction;
+
+  final double horizontalSwipeThreshold;
+
+  final double verticalSwipeThreshold;
+
+  static const double _defaultHorizontalSwipeThreshold = 0.44;
+  static const double _defaultVerticalSwipeThreshold = 0.32;
+  static const double _defaultViewFraction = 0.92;
+
+  static const _defaultRewindDuration = Duration(milliseconds: 650);
+
+  static const _defaultSwipeAssistDuration = Duration(milliseconds: 650);
+
+  static const _defaultStackClipBehaviour = Clip.hardEdge;
 
   @override
   _SwipeableStackState<T> createState() => _SwipeableStackState<T>();
@@ -66,6 +198,18 @@ class _SwipeableStackState<T extends Identifiable>
 
   CardProperty<T>? get _focusCardProperty =>
       _visibleCardProperties.isNotEmpty ? _visibleCardProperties.first : null;
+
+  CardDisplayInformation? _focusCardDisplayInformation;
+
+  int? get _focusIndex {
+    final focusId = _focusCardProperty?.id;
+    if (focusId == null) {
+      return null;
+    }
+    return _oldCardProperties.indexWhere(
+      (cp) => cp.id == focusId,
+    );
+  }
 
   @override
   void initState() {
@@ -101,10 +245,66 @@ class _SwipeableStackState<T extends Identifiable>
       builder: (context, constraints) {
         _assertLayout(constraints);
         _areConstraints = constraints;
-        return Stack(
-          children: _buildCards(
-            context,
-            constraints,
+        return GestureDetector(
+          onPanStart: (d) {
+            // if (!_canSwipe) {
+            //   return;
+            // }
+            //
+            // if (_swipeCancelAnimationController._animating) {
+            //   _swipeCancelAnimationController
+            //     ..stop()
+            //     ..reset();
+            // }
+            setState(() {
+              _focusCardDisplayInformation = CardDisplayInformation(
+                localPosition: d.localPosition,
+                startPosition: d.globalPosition,
+                currentPosition: d.globalPosition,
+              );
+            });
+          },
+          onPanUpdate: (d) {
+            // if (!_canSwipe) {
+            //   return;
+            // }
+            // if (_swipeCancelAnimationController._animating) {
+            //   _swipeCancelAnimationController
+            //     ..stop()
+            //     ..reset();
+            // }
+            setState(() {
+              final updated = _focusCardDisplayInformation?.copyWith(
+                currentPosition: d.globalPosition,
+              );
+              _focusCardDisplayInformation = updated ??
+                  CardDisplayInformation(
+                    localPosition: d.localPosition,
+                    startPosition: d.globalPosition,
+                    currentPosition: d.globalPosition,
+                  );
+            });
+          },
+          onPanEnd: (d) {
+            // if (!_canSwipe) {
+            //   return;
+            // }
+            // final swipeAssistDirection = _currentSession?.swipeAssistDirection(
+            //   constraints: constraints,
+            //   horizontalSwipeThreshold: widget.horizontalSwipeThreshold,
+            //   verticalSwipeThreshold: widget.verticalSwipeThreshold,
+            // );
+
+            // if (swipeAssistDirection == null) {
+            //   _cancelSwipe();
+            //   return;
+            // }
+          },
+          child: Stack(
+            children: _buildCards(
+              context,
+              constraints,
+            ),
           ),
         );
       },
@@ -114,68 +314,165 @@ class _SwipeableStackState<T extends Identifiable>
   void _assertLayout(BoxConstraints constraints) {
     assert(() {
       if (!constraints.hasBoundedHeight) {
-        throw FlutterError('SwipableStack was given unbounded height.');
+        throw FlutterError('SwipeableStack was given unbounded height.');
       }
       if (!constraints.hasBoundedWidth) {
-        throw FlutterError('SwipableStack was given unbounded width.');
+        throw FlutterError('SwipeableStack was given unbounded width.');
       }
       return true;
     }());
   }
 
   List<Widget> _buildCards(BuildContext context, BoxConstraints constraints) {
+    final session =
+        _focusCardDisplayInformation ?? CardDisplayInformation.notMoving();
     return List.generate(_visibleCardProperties.length, (index) {
       final cp = _visibleCardProperties[index];
-      return Positioned(
-        key: ValueKey(cp.id),
-        child: widget.builder(
-          context,
-          cp.data,
-          _areConstraints!,
+      final child = widget.builder(
+        context,
+        cp.data,
+        _areConstraints!,
+      );
+      return _SwipablePositioned(
+        key: child.key ?? ValueKey(cp.id),
+        viewFraction: widget.viewFraction,
+        displayInformation: session,
+        swipeDirectionRate: session.swipeDirectionRate(
+          constraints: constraints,
+          horizontalSwipeThreshold: widget.horizontalSwipeThreshold,
+          verticalSwipeThreshold: widget.verticalSwipeThreshold,
         ),
+        index: index,
+        areaConstraints: constraints,
+        child: child,
       );
     }).reversed.toList();
   }
 
   void _moveFocusForward() {
-    final _focusCardProperty = this._focusCardProperty;
-    if (_focusCardProperty == null) {
+    final _focusIndex = this._focusIndex;
+    if (_focusIndex == null) {
       return;
     }
-    final index = _oldCardProperties.indexWhere(
-      (cp) => cp.id == _focusCardProperty.id,
-    );
-    _oldCardProperties.replaceRange(
-      index,
-      index + 1,
-      [_oldCardProperties[index].copyWith(isJudged: true)],
+    _oldCardProperties.replaceAt(
+      _focusIndex,
+      replacement: _oldCardProperties[_focusIndex].copyWith(
+        isJudged: true,
+      ),
     );
     setState(() {});
   }
 
   void _moveFocusBack() {
-    if (_oldCardProperties.isEmpty) {
-      return;
-    }
-    int _focusIndex() {
-      final focusId = _focusCardProperty?.id;
-      if (focusId == null) {
-        return _oldCardProperties.length;
-      }
-      return _oldCardProperties.indexWhere(
-        (cp) => cp.id == focusId,
-      );
-    }
-
-    final nextIndex = _focusIndex() - 1;
+    final focusIndex = _focusIndex ?? _oldCardProperties.length;
+    final nextIndex = focusIndex - 1;
     if (nextIndex < 0) {
       return;
     }
-    _oldCardProperties.replaceRange(
+    _oldCardProperties.replaceAt(
       nextIndex,
-      nextIndex + 1,
-      [_oldCardProperties[nextIndex].copyWith(isJudged: false)],
+      replacement: _oldCardProperties[nextIndex].copyWith(
+        isJudged: false,
+      ),
     );
     setState(() {});
+  }
+}
+
+class _SwipablePositioned extends StatelessWidget {
+  const _SwipablePositioned({
+    required this.index,
+    CardDisplayInformation? displayInformation,
+    required this.areaConstraints,
+    required this.child,
+    required this.swipeDirectionRate,
+    required this.viewFraction,
+    Key? key,
+  })  : _displayInformation = displayInformation,
+        assert(0 <= viewFraction && viewFraction <= 1),
+        super(key: key);
+
+  final int index;
+  final CardDisplayInformation? _displayInformation;
+  final Widget child;
+  final BoxConstraints areaConstraints;
+  final _SwipeRatePerThreshold swipeDirectionRate;
+  final double viewFraction;
+
+  CardDisplayInformation get displayInformation =>
+      _displayInformation ?? CardDisplayInformation.notMoving();
+
+  Offset get _currentPositionDiff => displayInformation.difference;
+
+  bool get _isFirst => index == 0;
+
+  bool get _isSecond => index == 1;
+
+  double get _rotationAngle => _isFirst
+      ? _calculateAngle(_currentPositionDiff.dx, areaConstraints.maxWidth)
+      : 0;
+
+  static double _calculateAngle(double differenceX, double areaWidth) {
+    return -differenceX / areaWidth * math.pi / 18;
+  }
+
+  Offset get _rotationOrigin =>
+      _isFirst ? displayInformation.localPosition : Offset.zero;
+
+  double get _animationRate => 1 - viewFraction;
+
+  double _animationProgress() => Curves.easeOutCubic.transform(
+        math.min(swipeDirectionRate.rate, 1),
+      );
+
+  BoxConstraints _constraints(BuildContext context) {
+    if (_isFirst) {
+      return areaConstraints;
+    } else if (_isSecond) {
+      return areaConstraints *
+          (1 - _animationRate + _animationRate * _animationProgress());
+    } else {
+      return areaConstraints * (1 - _animationRate);
+    }
+  }
+
+  Offset _preferredPosition(BuildContext context) {
+    if (_isFirst) {
+      return _currentPositionDiff;
+    } else if (_isSecond) {
+      final constraintsDiff =
+          areaConstraints * (1 - _animationProgress()) * _animationRate / 2;
+      return Offset(
+        constraintsDiff.maxWidth,
+        constraintsDiff.maxHeight,
+      );
+    } else {
+      final maxDiff = areaConstraints * _animationRate / 2;
+      return Offset(
+        maxDiff.maxWidth,
+        maxDiff.maxHeight,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final position = _preferredPosition(context);
+    return Positioned(
+      top: position.dy,
+      left: position.dx,
+      child: Transform.rotate(
+        angle: _rotationAngle,
+        alignment: Alignment.topLeft,
+        origin: _rotationOrigin,
+        child: ConstrainedBox(
+          constraints: _constraints(context),
+          child: IgnorePointer(
+            ignoring: !_isFirst,
+            child: child,
+          ),
+        ),
+      ),
+    );
   }
 }
