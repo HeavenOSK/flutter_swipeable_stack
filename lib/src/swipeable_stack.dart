@@ -185,7 +185,6 @@ class SwipeableStack<T extends Identifiable> extends StatefulWidget {
 class _SwipeableStackState<T extends Identifiable>
     extends State<SwipeableStack<T>> with TickerProviderStateMixin {
   late final List<CardProperty<T>> _oldCardProperties;
-  BoxConstraints? _areConstraints;
 
   List<CardProperty<T>> get _visibleCardProperties {
     final notJudgedCardProperties =
@@ -210,6 +209,40 @@ class _SwipeableStackState<T extends Identifiable>
       (cp) => cp.id == focusId,
     );
   }
+
+  late final AnimationController _swipeCancelAnimationController =
+      AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+  );
+
+  late final AnimationController _rewindAnimationController =
+      AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 800),
+  );
+
+  late final AnimationController _swipeAnimationController =
+      AnimationController(
+    vsync: this,
+  );
+
+  late final AnimationController _swipeAssistController = AnimationController(
+    vsync: this,
+  );
+
+  bool get _canSwipe =>
+      !_swipeAssistController._animating &&
+      !_swipeAnimationController._animating &&
+      !_rewindAnimationController._animating;
+
+  bool get _canAnimationStart =>
+      !_swipeAssistController._animating &&
+      !_swipeAnimationController._animating &&
+      !_swipeCancelAnimationController._animating &&
+      !_rewindAnimationController._animating;
+
+  BoxConstraints? _areConstraints;
 
   @override
   void initState() {
@@ -240,6 +273,16 @@ class _SwipeableStackState<T extends Identifiable>
   }
 
   @override
+  void dispose() {
+    _swipeCancelAnimationController.dispose();
+    _swipeAnimationController.dispose();
+    _swipeAssistController.dispose();
+    _rewindAnimationController.dispose();
+    // TODO(heavenOSK): Remove dataSet listener.
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -247,15 +290,16 @@ class _SwipeableStackState<T extends Identifiable>
         _areConstraints = constraints;
         return GestureDetector(
           onPanStart: (d) {
-            // if (!_canSwipe) {
-            //   return;
-            // }
-            //
-            // if (_swipeCancelAnimationController._animating) {
-            //   _swipeCancelAnimationController
-            //     ..stop()
-            //     ..reset();
-            // }
+            print('onPanStart');
+            if (!_canSwipe) {
+              return;
+            }
+
+            if (_swipeCancelAnimationController._animating) {
+              _swipeCancelAnimationController
+                ..stop()
+                ..reset();
+            }
             setState(() {
               _focusCardDisplayInformation = CardDisplayInformation(
                 localPosition: d.localPosition,
@@ -265,14 +309,16 @@ class _SwipeableStackState<T extends Identifiable>
             });
           },
           onPanUpdate: (d) {
-            // if (!_canSwipe) {
-            //   return;
-            // }
-            // if (_swipeCancelAnimationController._animating) {
-            //   _swipeCancelAnimationController
-            //     ..stop()
-            //     ..reset();
-            // }
+            print('onPanUpdate');
+
+            if (!_canSwipe) {
+              return;
+            }
+            if (_swipeCancelAnimationController._animating) {
+              _swipeCancelAnimationController
+                ..stop()
+                ..reset();
+            }
             setState(() {
               final updated = _focusCardDisplayInformation?.copyWith(
                 currentPosition: d.globalPosition,
@@ -286,9 +332,11 @@ class _SwipeableStackState<T extends Identifiable>
             });
           },
           onPanEnd: (d) {
-            // if (!_canSwipe) {
-            //   return;
-            // }
+            print('onPanEnd');
+
+            if (!_canSwipe) {
+              return;
+            }
             // final swipeAssistDirection = _currentSession?.swipeAssistDirection(
             //   constraints: constraints,
             //   horizontalSwipeThreshold: widget.horizontalSwipeThreshold,
@@ -296,8 +344,8 @@ class _SwipeableStackState<T extends Identifiable>
             // );
 
             // if (swipeAssistDirection == null) {
-            //   _cancelSwipe();
-            //   return;
+            _cancelSwipe();
+            // return;
             // }
           },
           child: Stack(
@@ -347,6 +395,44 @@ class _SwipeableStackState<T extends Identifiable>
         child: child,
       );
     }).reversed.toList();
+  }
+
+  void _cancelSwipe() {
+    final _focusCardDisplayInformation = this._focusCardDisplayInformation;
+    if (_focusCardDisplayInformation == null) {
+      return;
+    }
+    final cancelAnimation = _swipeCancelAnimationController._cancelAnimation(
+      startPosition: _focusCardDisplayInformation.startPosition,
+      currentPosition: _focusCardDisplayInformation.currentPosition,
+    );
+    void _animate() {
+      _animatePosition(cancelAnimation);
+    }
+
+    cancelAnimation.addListener(_animate);
+    _swipeCancelAnimationController.forward(from: 0).then(
+      (_) {
+        cancelAnimation.removeListener(_animate);
+        _resetDisplayInformation();
+      },
+    ).catchError((dynamic c) {
+      cancelAnimation.removeListener(_animate);
+    });
+  }
+
+  void _animatePosition(Animation<Offset> positionAnimation) {
+    setState(() {
+      _focusCardDisplayInformation = _focusCardDisplayInformation?.copyWith(
+        currentPosition: positionAnimation.value,
+      );
+    });
+  }
+
+  void _resetDisplayInformation() {
+    setState(() {
+      _focusCardDisplayInformation = null;
+    });
   }
 
   void _moveFocusForward() {

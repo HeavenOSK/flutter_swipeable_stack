@@ -83,7 +83,6 @@ class _HomeState extends State<Home> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
               child: ConstrainedBox(
                 constraints: constraints,
                 child: Column(
