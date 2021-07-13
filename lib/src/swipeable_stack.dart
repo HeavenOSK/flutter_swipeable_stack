@@ -148,7 +148,7 @@ class _SwipeableStackState<T extends Identifiable>
     _oldCardProperties.replaceRange(
       index,
       index + 1,
-      [_oldCardProperties[index].copyWithJudged(isJudged: true)],
+      [_oldCardProperties[index].copyWith(isJudged: true)],
     );
     setState(() {});
   }
@@ -174,7 +174,7 @@ class _SwipeableStackState<T extends Identifiable>
     _oldCardProperties.replaceRange(
       nextIndex,
       nextIndex + 1,
-      [_oldCardProperties[nextIndex].copyWithJudged(isJudged: false)],
+      [_oldCardProperties[nextIndex].copyWith(isJudged: false)],
     );
     setState(() {});
   }
