@@ -297,7 +297,7 @@ class SwipeableStack<T extends SwipeableStackIdentifiable>
   final List<T> dataSet;
   final SwipeableStackItemBuilder<T> builder;
   final SwipeableStackOverlayBuilder<T>? overlayBuilder;
-  final SwipeCompletionCallback? onSwipeCompleted;
+  final SwipeCompletionCallback<T>? onSwipeCompleted;
   final OnWillMoveNext<T>? onWillMoveNext;
   final double viewFraction;
   final double horizontalSwipeThreshold;
