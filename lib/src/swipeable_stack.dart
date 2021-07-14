@@ -22,13 +22,33 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
 
   var _cardProperties = <CardProperty<T>>[];
 
-  bool _markRemovedFocusProperty = false;
-
   int get size => _cardProperties.length;
 
   T? get currentData => _focusCardProperty?.data;
 
   int? get currentIndex => _focusIndex;
+
+  void next({
+    required SwipeDirection swipeDirection,
+    bool shouldCallCompletionCallback = true,
+    bool ignoreOnWillMoveNext = false,
+    Duration? duration,
+  }) {
+    _swipeableStackStateKey.currentState?._next(
+      swipeDirection: swipeDirection,
+      shouldCallCompletionCallback: shouldCallCompletionCallback,
+      ignoreOnWillMoveNext: ignoreOnWillMoveNext,
+      duration: duration,
+    );
+  }
+
+  void rewind({
+    Duration duration = const Duration(milliseconds: 650),
+  }) {
+    _swipeableStackStateKey.currentState?._rewind(
+      duration: duration,
+    );
+  }
 
   List<CardProperty<T>> get _visibleCardProperties {
     final notJudgedCardProperties =
@@ -61,6 +81,8 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
     }
     return _cardProperties[targetIndex];
   }
+
+  bool _markRemovedFocusProperty = false;
 
   void _arrangeCardProperties({
     required List<T> newDataSet,
@@ -99,28 +121,6 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
       lastCardDisplayInformation: lastCardDisplayInformation,
     );
     notifyListeners();
-  }
-
-  void next({
-    required SwipeDirection swipeDirection,
-    bool shouldCallCompletionCallback = true,
-    bool ignoreOnWillMoveNext = false,
-    Duration? duration,
-  }) {
-    _swipeableStackStateKey.currentState?._next(
-      swipeDirection: swipeDirection,
-      shouldCallCompletionCallback: shouldCallCompletionCallback,
-      ignoreOnWillMoveNext: ignoreOnWillMoveNext,
-      duration: duration,
-    );
-  }
-
-  void rewind({
-    Duration duration = const Duration(milliseconds: 650),
-  }) {
-    _swipeableStackStateKey.currentState?._rewind(
-      duration: duration,
-    );
   }
 }
 
@@ -365,10 +365,8 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
       newDataSet: widget.dataSet,
     );
     if (_controller._markRemovedFocusProperty) {
-      WidgetsBinding.instance?.addPostFrameCallback((timeStamp) {
-        setState(() {
-          _focusCardDisplayInformation = null;
-        });
+      setState(() {
+        _focusCardDisplayInformation = null;
       });
     }
   }
