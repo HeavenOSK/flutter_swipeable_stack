@@ -82,16 +82,23 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
     return _cardProperties[targetIndex];
   }
 
-  bool _markRemovedFocusProperty = false;
-
-  void _arrangeCardProperties({
+  // Return whether removed focus card or not.
+  //
+  // true: removed focus card
+  // false: didn't remove focus card.
+  bool _arrangeCardProperties({
     required List<T> newDataSet,
+    required bool persistJudgedCard,
   }) {
-    _markRemovedFocusProperty = false;
-    final newCardProperties =
-        newDataSet.map((data) => CardProperty<T>(data: data)).toList();
-    final removed = _cardProperties.removedDifference(
-      newData: newCardProperties,
+    var _markRemovedFocusProperty = false;
+    final newCardProperties = newDataSet
+        .map(
+          (data) => CardProperty<T>(data: data),
+        )
+        .toList();
+    final removed = _removedItems(
+      newCardProperties: newCardProperties,
+      persistJudgedCard: persistJudgedCard,
     );
     final added = _cardProperties.addedDifference(
       newData: newCardProperties,
@@ -108,6 +115,20 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
       _cardProperties.add(item);
     }
     notifyListeners();
+    return _markRemovedFocusProperty;
+  }
+
+  List<CardProperty<T>> _removedItems({
+    required List<CardProperty<T>> newCardProperties,
+    required bool persistJudgedCard,
+  }) {
+    final removed = _cardProperties.removedDifference(
+      newData: newCardProperties,
+    );
+    if (!persistJudgedCard) {
+      return removed;
+    }
+    return removed.where((cp) => !cp.isJudged).toList();
   }
 
   void _judge({
@@ -287,6 +308,7 @@ class SwipeableStack<T extends SwipeableStackIdentifiable>
     this.swipeAssistDuration = const Duration(milliseconds: 650),
     this.viewFraction = 0.92,
     this.stackClipBehaviour = Clip.hardEdge,
+    this.persistJudgedCard = false,
   })  : controller = controller ?? SwipeableStackController<T>(),
         assert(0 <= viewFraction && viewFraction <= 1),
         assert(0 <= horizontalSwipeThreshold && horizontalSwipeThreshold <= 1),
@@ -304,6 +326,7 @@ class SwipeableStack<T extends SwipeableStackIdentifiable>
   final double verticalSwipeThreshold;
   final Duration swipeAssistDuration;
   final Clip stackClipBehaviour;
+  final bool persistJudgedCard;
 
   @override
   _SwipeableStackState<T> createState() => _SwipeableStackState<T>();
@@ -361,10 +384,11 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
   @override
   void didUpdateWidget(covariant SwipeableStack<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _controller._arrangeCardProperties(
+    final removedFocusProperty = _controller._arrangeCardProperties(
       newDataSet: widget.dataSet,
+      persistJudgedCard: widget.persistJudgedCard,
     );
-    if (_controller._markRemovedFocusProperty) {
+    if (removedFocusProperty) {
       setState(() {
         _focusCardDisplayInformation = null;
       });
