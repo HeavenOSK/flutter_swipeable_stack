@@ -738,7 +738,7 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
       (_) {
         animation.removeListener(animate);
         widget.onSwipeCompleted?.call(
-          _focusCardProperty,
+          _focusCardProperty.data,
           swipeDirection,
         );
         final cloned = this._focusCardDisplayInformation?.cloned();
