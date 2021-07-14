@@ -10,19 +10,19 @@ abstract class SwipeableStackIdentifiable {
 }
 
 extension DifferenceX on List<SwipeableStackIdentifiable> {
-  Set<T> addedDifference<T extends SwipeableStackIdentifiable>({
+  List<T> addedDifference<T extends SwipeableStackIdentifiable>({
     required List<T> newData,
   }) {
     final oldDataSet = Set<T>.from(this);
     final newDataSet = Set<T>.from(newData);
-    return newDataSet.difference(oldDataSet);
+    return newDataSet.difference(oldDataSet).toList();
   }
 
-  Set<T> removedDifference<T extends SwipeableStackIdentifiable>({
+  List<T> removedDifference<T extends SwipeableStackIdentifiable>({
     required List<T> newData,
   }) {
     final oldDataSet = Set<T>.from(this);
     final newDataSet = Set<T>.from(newData);
-    return oldDataSet.difference(newDataSet);
+    return oldDataSet.difference(newDataSet).toList();
   }
 }
