@@ -1,3 +1,6 @@
+## 0.3.1
+- Add generics for [onSwipeCompleted] callback.
+
 ## 0.3.0
 - Not to use ValueNotifier.
 

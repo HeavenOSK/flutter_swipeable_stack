@@ -297,7 +297,7 @@ class SwipeableStack<T extends SwipeableStackIdentifiable>
   final List<T> dataSet;
   final SwipeableStackItemBuilder<T> builder;
   final SwipeableStackOverlayBuilder<T>? overlayBuilder;
-  final SwipeCompletionCallback? onSwipeCompleted;
+  final SwipeCompletionCallback<T>? onSwipeCompleted;
   final OnWillMoveNext<T>? onWillMoveNext;
   final double viewFraction;
   final double horizontalSwipeThreshold;
@@ -738,7 +738,7 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
       (_) {
         animation.removeListener(animate);
         widget.onSwipeCompleted?.call(
-          _focusCardProperty,
+          _focusCardProperty.data,
           swipeDirection,
         );
         final cloned = this._focusCardDisplayInformation?.cloned();
