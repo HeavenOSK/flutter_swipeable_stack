@@ -342,6 +342,7 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
     widget.dataSet.addListener(
       _notifyNewCards,
     );
+    _controller.addListener(_setState);
   }
 
   void _notifyNewCards() {
@@ -350,15 +351,18 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
     );
   }
 
+  void _setState() {
+    setState(() {});
+  }
+
   @override
   void dispose() {
     _swipeCancelAnimationController.dispose();
     _swipeAnimationController.dispose();
     _swipeAssistController.dispose();
     _rewindAnimationController.dispose();
-    widget.dataSet.removeListener(
-      _notifyNewCards,
-    );
+    widget.dataSet.removeListener(_notifyNewCards);
+    _controller.removeListener(_setState);
     super.dispose();
   }
 
