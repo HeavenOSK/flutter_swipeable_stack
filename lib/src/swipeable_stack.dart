@@ -22,6 +22,8 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
 
   var _cardProperties = <CardProperty<T>>[];
 
+  bool _markRemovedFocusProperty = false;
+
   int get size => _cardProperties.length;
 
   T? get currentData => _focusCardProperty?.data;
@@ -62,6 +64,7 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
   void _arrangeCardProperties({
     required List<T> newDataSet,
   }) {
+    _markRemovedFocusProperty = false;
     final newCardProperties =
         newDataSet.map((data) => CardProperty<T>(data: data)).toList();
     final removed = _cardProperties.removedDifference(
@@ -71,6 +74,9 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
       newData: newCardProperties,
     );
     for (final item in removed) {
+      if (_focusCardProperty?.id == item.id) {
+        _markRemovedFocusProperty = true;
+      }
       _cardProperties.removeWhere(
         (cp) => cp.id == item.id,
       );
@@ -277,7 +283,7 @@ class SwipeableStack<T extends SwipeableStackIdentifiable>
         super(key: controller?._swipeableStackStateKey);
 
   final SwipeableStackController<T> controller;
-  final ValueNotifier<List<T>> dataSet;
+  final List<T> dataSet;
   final SwipeableStackItemBuilder<T> builder;
   final SwipeableStackOverlayBuilder<T>? overlayBuilder;
   final SwipeCompletionCallback? onSwipeCompleted;
@@ -336,19 +342,24 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
   @override
   void initState() {
     super.initState();
-    _controller._cardProperties = widget.dataSet.value
-        .map((data) => CardProperty<T>(data: data))
-        .toList();
-    widget.dataSet.addListener(
-      _notifyNewCards,
-    );
+    _controller._cardProperties =
+        widget.dataSet.map((data) => CardProperty<T>(data: data)).toList();
     _controller.addListener(_setState);
   }
 
-  void _notifyNewCards() {
+  @override
+  void didUpdateWidget(covariant SwipeableStack<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
     _controller._arrangeCardProperties(
-      newDataSet: widget.dataSet.value,
+      newDataSet: widget.dataSet,
     );
+    if (_controller._markRemovedFocusProperty) {
+      WidgetsBinding.instance?.addPostFrameCallback((timeStamp) {
+        setState(() {
+          _focusCardDisplayInformation = null;
+        });
+      });
+    }
   }
 
   void _setState() {
@@ -361,7 +372,6 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
     _swipeAnimationController.dispose();
     _swipeAssistController.dispose();
     _rewindAnimationController.dispose();
-    widget.dataSet.removeListener(_notifyNewCards);
     _controller.removeListener(_setState);
     super.dispose();
   }
@@ -820,6 +830,9 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
       },
     ).catchError((dynamic c) {
       animation.removeListener(animate);
+      setState(() {
+        this._focusCardDisplayInformation = null;
+      });
     });
   }
 
