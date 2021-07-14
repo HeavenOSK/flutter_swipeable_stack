@@ -1,6 +1,8 @@
-## 0.3.2
-- Add [persistJudgedCard] option. 
+## 0.3.3
+- export `callbacks.dart`.
 
+## 0.3.2
+- Add [persistJudgedCard] option.
 
 ## 0.3.1
 - Add generics for [onSwipeCompleted] callback.

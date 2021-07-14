@@ -1,6 +1,6 @@
 name: swipeable_stack
 description: A new Flutter project.
-version: 0.3.2
+version: 0.3.3
 homepage: https://github.com/HeavenOSK/flutter_swipeable_stack
 environment:
   sdk: ">=2.13.0 <3.0.0"
