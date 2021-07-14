@@ -38,29 +38,11 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   late final _controller = SwipeableStackController<CardData>();
-  late final _cards = ValueNotifier<List<CardData>>(
-    CardData.initialDeck(),
-  );
+  var _cards = CardData.initialDeck();
 
   String? _inputText;
 
-  String get _ids => '[${_cards.value.map((cp) => cp.id).join(',')}]';
-
-  @override
-  void initState() {
-    super.initState();
-    _cards.addListener(_setState);
-  }
-
-  @override
-  void dispose() {
-    _cards.removeListener(_setState);
-    super.dispose();
-  }
-
-  void _setState() {
-    setState(() {});
-  }
+  String get _ids => '[${_cards.map((cp) => cp.id).join(',')}]';
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +57,9 @@ class _HomeState extends State<Home> {
           Center(
             child: _button(
               onPressed: () {
-                _cards.value = [];
+                setState(() {
+                  _cards = [];
+                });
               },
               color: Colors.red,
               label: 'reset',
@@ -281,17 +265,21 @@ class _HomeState extends State<Home> {
   void _removeCard({
     required String id,
   }) {
-    _cards.value = _cards.value
-        .where(
-          (identifiable) => !(identifiable.id == id),
-        )
-        .toList();
+    setState(() {
+      _cards = _cards
+          .where(
+            (identifiable) => !(identifiable.id == id),
+          )
+          .toList();
+    });
   }
 
   void _addCards({
     required List<CardData> cards,
   }) {
-    _cards.value += cards;
+    setState(() {
+      _cards += cards;
+    });
   }
 
   Widget _button({

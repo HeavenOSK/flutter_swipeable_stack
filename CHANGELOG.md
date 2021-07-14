@@ -1,3 +1,6 @@
+## 0.3.0
+- Not to use ValueNotifier.
+
 ## 0.2.0
 
 - Refactor: Move cardProperties to [SwipeableStackController].
