@@ -47,9 +47,10 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
     if (focusId == null) {
       return null;
     }
-    return _cardProperties.indexWhere(
+    final index = _cardProperties.indexWhereOrNull(
       (cp) => cp.id == focusId,
     );
+    return index;
   }
 
   CardProperty<T>? get _rewindTarget {
@@ -123,6 +124,16 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
   }
 }
 
+extension _IndexWhereOrNull<E> on List<E> {
+  int? indexWhereOrNull(bool test(E element), [int start = 0]) {
+    final index = indexWhere(test, start);
+    if (index < 0) {
+      return null;
+    }
+    return index;
+  }
+}
+
 extension _CardPropertiesX<T extends SwipeableStackIdentifiable>
     on List<CardProperty<T>> {
   void _replaceAt(
@@ -140,10 +151,10 @@ extension _CardPropertiesX<T extends SwipeableStackIdentifiable>
     required bool isJudged,
     required CardDisplayInformation? lastCardDisplayInformation,
   }) {
-    final index = indexWhere(
+    final index = indexWhereOrNull(
       (element) => element.id == id,
     );
-    if (index < 0) {
+    if (index == null) {
       return;
     }
     _replaceAt(
