@@ -388,11 +388,28 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
       newDataSet: widget.dataSet,
       persistJudgedCard: widget.persistJudgedCard,
     );
-    if (removedFocusProperty) {
-      setState(() {
-        _focusCardDisplayInformation = null;
-      });
+    if (!removedFocusProperty) {
+      return;
     }
+    _resetAnimations();
+    setState(() {
+      _focusCardDisplayInformation = null;
+    });
+  }
+
+  void _resetAnimations() {
+    _swipeAnimationController
+      ..stop()
+      ..reset();
+    _swipeAssistController
+      ..stop()
+      ..reset();
+    _swipeCancelAnimationController
+      ..stop()
+      ..reset();
+    _rewindAnimationController
+      ..stop()
+      ..reset();
   }
 
   void _setState() {
