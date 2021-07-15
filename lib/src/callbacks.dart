@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'identifiable.dart';
-import 'swipeable_stack.dart';
+import 'swipe_direction.dart';
 
 typedef SwipeableStackItemBuilder<T extends SwipeableStackIdentifiable> = Widget
     Function(

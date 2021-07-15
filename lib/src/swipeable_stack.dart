@@ -6,13 +6,7 @@ import 'callbacks.dart';
 import 'card_display_information.dart';
 import 'card_property.dart';
 import 'identifiable.dart';
-
-enum SwipeDirection {
-  left,
-  right,
-  up,
-  down,
-}
+import 'swipe_direction.dart';
 
 class SwipeableStackController<T extends SwipeableStackIdentifiable>
     extends ChangeNotifier {
@@ -185,6 +179,24 @@ extension _CardPropertiesX<T extends SwipeableStackIdentifiable>
         lastDisplayInformation: lastCardDisplayInformation,
       ),
     );
+  }
+}
+
+extension _DifferenceX on List<SwipeableStackIdentifiable> {
+  List<T> addedDifference<T extends SwipeableStackIdentifiable>({
+    required List<T> newData,
+  }) {
+    final oldDataSet = Set<T>.from(this);
+    final newDataSet = Set<T>.from(newData);
+    return newDataSet.difference(oldDataSet).toList();
+  }
+
+  List<T> removedDifference<T extends SwipeableStackIdentifiable>({
+    required List<T> newData,
+  }) {
+    final oldDataSet = Set<T>.from(this);
+    final newDataSet = Set<T>.from(newData);
+    return oldDataSet.difference(newDataSet).toList();
   }
 }
 
