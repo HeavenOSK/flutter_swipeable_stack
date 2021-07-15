@@ -21,7 +21,7 @@ class CardData extends SwipeableStackIdentifiable {
   }
 
   static List<CardData> initialDeck() {
-    final color = Colors.green;
+    const color = Colors.green;
     return [
       CardData(
         id: '1',
@@ -42,7 +42,7 @@ class CardData extends SwipeableStackIdentifiable {
   }
 
   static List<CardData> newDeck() {
-    final color = Colors.red;
+    const color = Colors.red;
     return [
       CardData(
         id: '4',
@@ -63,7 +63,7 @@ class CardData extends SwipeableStackIdentifiable {
   }
 
   static List<CardData> includesOldCard() {
-    final color = Colors.blue;
+    const color = Colors.blue;
     return [
       CardData(
         id: '2',
