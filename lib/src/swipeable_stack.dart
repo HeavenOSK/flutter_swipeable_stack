@@ -20,7 +20,7 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
 
   T? get currentData => _focusCardProperty?.data;
 
-  int? get currentIndex => _focusIndex;
+  int get currentIndex => _focusIndex ?? _cardProperties.length;
 
   void next({
     required SwipeDirection swipeDirection,
@@ -68,8 +68,7 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
   }
 
   CardProperty<T>? get _rewindTarget {
-    final focusIndex = _focusIndex ?? _cardProperties.length;
-    final targetIndex = focusIndex - 1;
+    final targetIndex = currentIndex - 1;
     if (targetIndex < 0) {
       return null;
     }
