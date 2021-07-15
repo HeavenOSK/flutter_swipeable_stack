@@ -1,5 +1,8 @@
+## 0.3.4
+- Cancel animations when the front card is removed. 
+
 ## 0.3.3
-- export `callbacks.dart`.
+- Export `callbacks.dart`.
 
 ## 0.3.2
 - Add [persistJudgedCard] option.
