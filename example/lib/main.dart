@@ -40,7 +40,6 @@ class _HomeState extends State<Home> {
   late final _controller = SwipeableStackController<CardData>();
   var _cards = CardData.initialDeck();
 
-  bool _persistJudgedCard = false;
   String? _inputText;
 
   String get _ids => '[${_cards.map((cp) => cp.id).join(',')}]';
@@ -59,11 +58,11 @@ class _HomeState extends State<Home> {
             child: _button(
               onPressed: () {
                 setState(() {
-                  _persistJudgedCard = !_persistJudgedCard;
+                  _cards = [];
                 });
               },
               color: Colors.red,
-              label: '_persist:\n$_persistJudgedCard',
+              label: 'reset',
             ),
           ),
         ],
@@ -81,7 +80,6 @@ class _HomeState extends State<Home> {
                       child: Padding(
                         padding: const EdgeInsets.all(8),
                         child: SwipeableStack<CardData>(
-                          persistJudgedCard: _persistJudgedCard,
                           stackClipBehaviour: Clip.none,
                           controller: _controller,
                           dataSet: _cards,
@@ -250,16 +248,6 @@ class _HomeState extends State<Home> {
                           },
                           color: Colors.brown,
                           label: 'remove',
-                        ),
-                        const SizedBox(width: 4),
-                        _button(
-                          onPressed: () {
-                            setState(() {
-                              _cards = [];
-                            });
-                          },
-                          color: Colors.red,
-                          label: 'reset',
                         ),
                         const SizedBox(width: 4),
                       ],
