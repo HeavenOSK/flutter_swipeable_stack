@@ -1,3 +1,6 @@
+## 0.4.0
+- Delete `persistJudgedCard` option.
+
 ## 0.3.5
 - Change [SwipeableStackController#currentIndex] non-nullable. 
  
