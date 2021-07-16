@@ -1,3 +1,6 @@
+## 0.3.5
+- Change [SwipeableStackController#currentIndex] non-nullable. 
+ 
 ## 0.3.4
 - Cancel animations when the front card is removed. 
 
