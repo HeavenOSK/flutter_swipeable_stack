@@ -1,17 +1,17 @@
-import 'package:swipeable_stack/src/card_display_information.dart';
-import 'package:swipeable_stack/src/identifiable.dart';
+import 'package:swipeable_stack/src/swipeable_stack_identifiable.dart';
+import 'package:swipeable_stack/src/swipeable_stack_position.dart';
 
 class CardProperty<T extends SwipeableStackIdentifiable>
     extends SwipeableStackIdentifiable {
   CardProperty({
     required this.data,
-    this.lastDisplayInformation,
+    this.lastPosition,
     this.isJudged = false,
   });
 
   final T data;
   final bool isJudged;
-  final CardDisplayInformation? lastDisplayInformation;
+  final SwipeableStackPosition? lastPosition;
 
   @override
   String get id => data.id;
@@ -19,13 +19,12 @@ class CardProperty<T extends SwipeableStackIdentifiable>
   CardProperty<T> copyWith({
     T? data,
     bool? isJudged,
-    CardDisplayInformation? lastDisplayInformation,
+    SwipeableStackPosition? lastPosition,
   }) {
     return CardProperty(
       data: data ?? this.data,
       isJudged: isJudged ?? this.isJudged,
-      lastDisplayInformation:
-          lastDisplayInformation ?? this.lastDisplayInformation,
+      lastPosition: lastPosition ?? this.lastPosition,
     );
   }
 }
