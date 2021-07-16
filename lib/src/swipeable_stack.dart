@@ -6,13 +6,7 @@ import 'callbacks.dart';
 import 'card_display_information.dart';
 import 'card_property.dart';
 import 'identifiable.dart';
-
-enum SwipeDirection {
-  left,
-  right,
-  up,
-  down,
-}
+import 'swipe_direction.dart';
 
 class SwipeableStackController<T extends SwipeableStackIdentifiable>
     extends ChangeNotifier {
@@ -26,7 +20,7 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
 
   T? get currentData => _focusCardProperty?.data;
 
-  int? get currentIndex => _focusIndex;
+  int get currentIndex => _focusIndex ?? _cardProperties.length;
 
   void next({
     required SwipeDirection swipeDirection,
@@ -74,8 +68,7 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
   }
 
   CardProperty<T>? get _rewindTarget {
-    final focusIndex = _focusIndex ?? _cardProperties.length;
-    final targetIndex = focusIndex - 1;
+    final targetIndex = currentIndex - 1;
     if (targetIndex < 0) {
       return null;
     }
@@ -185,6 +178,24 @@ extension _CardPropertiesX<T extends SwipeableStackIdentifiable>
         lastDisplayInformation: lastCardDisplayInformation,
       ),
     );
+  }
+}
+
+extension _DifferenceX on List<SwipeableStackIdentifiable> {
+  List<T> addedDifference<T extends SwipeableStackIdentifiable>({
+    required List<T> newData,
+  }) {
+    final oldDataSet = Set<T>.from(this);
+    final newDataSet = Set<T>.from(newData);
+    return newDataSet.difference(oldDataSet).toList();
+  }
+
+  List<T> removedDifference<T extends SwipeableStackIdentifiable>({
+    required List<T> newData,
+  }) {
+    final oldDataSet = Set<T>.from(this);
+    final newDataSet = Set<T>.from(newData);
+    return oldDataSet.difference(newDataSet).toList();
   }
 }
 
