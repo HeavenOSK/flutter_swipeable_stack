@@ -1,31 +1,36 @@
 import 'package:flutter/material.dart';
 
 import 'swipe_direction.dart';
+import 'swipeable_stack.dart';
 import 'swipeable_stack_identifiable.dart';
 
-typedef SwipeableStackItemBuilder<T extends SwipeableStackIdentifiable> = Widget
+/// A callback to build Widget with a [data].
+typedef SwipeableStackItemBuilder<D extends SwipeableStackIdentifiable> = Widget
     Function(
   BuildContext context,
-  T data,
+  D data,
   BoxConstraints constraints,
 );
 
-typedef SwipeCompletionCallback<T extends SwipeableStackIdentifiable> = void
+/// A callback to show as a card with a [data].
+typedef SwipeCompletionCallback<D extends SwipeableStackIdentifiable> = void
     Function(
-  T data,
+  D data,
   SwipeDirection direction,
 );
 
-typedef OnWillMoveNext<T extends SwipeableStackIdentifiable> = bool Function(
-  T data,
+/// A callback for [SwipeableStack.onWillMoveNext].
+typedef OnWillMoveNext<D extends SwipeableStackIdentifiable> = bool Function(
+  D data,
   SwipeDirection swipeDirection,
 );
 
-typedef SwipeableStackOverlayBuilder<T extends SwipeableStackIdentifiable>
+/// A callback for [SwipeableStack.overlayBuilder].
+typedef SwipeableStackOverlayBuilder<D extends SwipeableStackIdentifiable>
     = Widget Function(
   BuildContext context,
   BoxConstraints constraints,
-  T data,
+  D data,
   SwipeDirection direction,
   double swipeProgress,
 );

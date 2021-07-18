@@ -1,7 +1,9 @@
-import 'package:swipeable_stack/src/swipeable_stack_identifiable.dart';
-import 'package:swipeable_stack/src/swipeable_stack_position.dart';
+import 'swipeable_stack.dart';
+import 'swipeable_stack_identifiable.dart';
+import 'swipeable_stack_position.dart';
 
-class CardProperty<T extends SwipeableStackIdentifiable>
+/// A class which has [data] & metadata for [SwipeableStack].
+class CardProperty<D extends SwipeableStackIdentifiable>
     extends SwipeableStackIdentifiable {
   CardProperty({
     required this.data,
@@ -9,15 +11,15 @@ class CardProperty<T extends SwipeableStackIdentifiable>
     this.isJudged = false,
   });
 
-  final T data;
+  final D data;
   final bool isJudged;
   final SwipeableStackPosition? lastPosition;
 
   @override
   String get id => data.id;
 
-  CardProperty<T> copyWith({
-    T? data,
+  CardProperty<D> copyWith({
+    D? data,
     bool? isJudged,
     SwipeableStackPosition? lastPosition,
   }) {
