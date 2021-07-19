@@ -437,9 +437,7 @@ class _SwipeableStackState<D extends SwipeableStackIdentifiable>
       return;
     }
     _resetAnimations();
-    setState(() {
-      _focusCardPosition = null;
-    });
+    _focusCardPosition = null;
   }
 
   void _resetAnimations() {
