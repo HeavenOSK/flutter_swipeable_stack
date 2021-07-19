@@ -18,7 +18,7 @@ class SwipeableStackController<D extends SwipeableStackIdentifiable>
     extends ChangeNotifier {
   SwipeableStackController();
 
-  final _swipeableStackStateKey = GlobalKey<_SwipeableStackState>();
+  _SwipeableStackState<D>? _swipeableStackState;
 
   var _cardProperties = <CardProperty<D>>[];
 
@@ -44,7 +44,11 @@ class SwipeableStackController<D extends SwipeableStackIdentifiable>
     bool ignoreOnWillMoveNext = false,
     Duration? duration,
   }) {
-    _swipeableStackStateKey.currentState?._next(
+    assert(
+      _swipeableStackState != null,
+      '$SwipeableStackController must be passed for $SwipeableStack.',
+    );
+    _swipeableStackState?._next(
       swipeDirection: swipeDirection,
       shouldCallCompletionCallback: shouldCallCompletionCallback,
       ignoreOnWillMoveNext: ignoreOnWillMoveNext,
@@ -58,7 +62,11 @@ class SwipeableStackController<D extends SwipeableStackIdentifiable>
   void rewind({
     Duration duration = const Duration(milliseconds: 650),
   }) {
-    _swipeableStackStateKey.currentState?._rewind(
+    assert(
+      _swipeableStackState != null,
+      '$SwipeableStackController must be passed for $SwipeableStack.',
+    );
+    _swipeableStackState?._rewind(
       duration: duration,
     );
   }
@@ -334,11 +342,12 @@ class SwipeableStack<D extends SwipeableStackIdentifiable>
     this.swipeAssistDuration = const Duration(milliseconds: 650),
     this.viewFraction = 0.92,
     this.stackClipBehaviour = Clip.hardEdge,
+    Key? key,
   })  : controller = controller ?? SwipeableStackController<D>(),
         assert(0 <= viewFraction && viewFraction <= 1),
         assert(0 <= horizontalSwipeThreshold && horizontalSwipeThreshold <= 1),
         assert(0 <= verticalSwipeThreshold && verticalSwipeThreshold <= 1),
-        super(key: controller?._swipeableStackStateKey);
+        super(key: key);
 
   /// An object to manipulate [SwipeableStack].
   final SwipeableStackController<D> controller;
@@ -424,9 +433,14 @@ class _SwipeableStackState<D extends SwipeableStackIdentifiable>
   @override
   void initState() {
     super.initState();
-    _controller._cardProperties =
-        widget.dataSet.map((data) => CardProperty<D>(data: data)).toList();
-    _controller.addListener(_setState);
+    _controller
+      .._swipeableStackState = this
+      .._cardProperties = widget.dataSet
+          .map(
+            (data) => CardProperty<D>(data: data),
+          )
+          .toList()
+      ..addListener(_setState);
   }
 
   @override
@@ -467,7 +481,9 @@ class _SwipeableStackState<D extends SwipeableStackIdentifiable>
     _swipeAnimationController.dispose();
     _swipeAssistController.dispose();
     _rewindAnimationController.dispose();
-    _controller.removeListener(_setState);
+    _controller
+      .._swipeableStackState = null
+      ..removeListener(_setState);
     super.dispose();
   }
 
