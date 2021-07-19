@@ -127,7 +127,9 @@ class SwipeableStackController<D extends SwipeableStackIdentifiable>
     for (final item in added) {
       _cardProperties.add(item);
     }
-    notifyListeners();
+    WidgetsBinding.instance!.addPostFrameCallback((_) {
+      notifyListeners();
+    });
     return _markRemovedFocusProperty;
   }
 
