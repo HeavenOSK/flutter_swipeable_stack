@@ -1,3 +1,6 @@
+## 0.4.1
+- Fix: Delete unnecessary `setState` in `_SwipeableStackState.didUpdateWidget`.
+
 ## 0.4.0
 - Delete `persistJudgedCard` option.
 
