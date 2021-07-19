@@ -8,20 +8,36 @@ import 'swipe_direction.dart';
 import 'swipeable_stack_identifiable.dart';
 import 'swipeable_stack_position.dart';
 
-class SwipeableStackController<T extends SwipeableStackIdentifiable>
+/// A class which controls [SwipeableStack].
+///
+/// You can use this controller to do [next] & [rewind].
+///
+/// You can also access information about [SwipeableStack] through
+/// this controller. ([size], [currentData], [currentIndex])
+class SwipeableStackController<D extends SwipeableStackIdentifiable>
     extends ChangeNotifier {
   SwipeableStackController();
 
   final _swipeableStackStateKey = GlobalKey<_SwipeableStackState>();
 
-  var _cardProperties = <CardProperty<T>>[];
+  var _cardProperties = <CardProperty<D>>[];
 
+  /// The size of current [SwipeableStack]'s [dataSet].
   int get size => _cardProperties.length;
 
-  T? get currentData => _focusCardProperty?.data;
+  /// The data of the card currently displayed on the front.
+  D? get currentData => _focusCardProperty?.data;
 
+  /// The index of the card currently displayed on the front.
   int get currentIndex => _focusIndex ?? _cardProperties.length;
 
+  /// Advance to the next card with specified swipeDirection.
+  ///
+  /// You can reject SwipableStack.onSwipeCompleted invocation by setting shouldCallCompletionCallback to false.
+  ///
+  /// You can ignore checking with SwipableStack#onWillMoveNext by setting ignoreOnWillMoveNext to true.
+  ///
+  /// You can change animation speed by setting duration.
   void next({
     required SwipeDirection swipeDirection,
     bool shouldCallCompletionCallback = true,
@@ -36,6 +52,9 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
     );
   }
 
+  /// Rewind the most recent action.
+  ///
+  /// You can change animation speed by setting duration.
   void rewind({
     Duration duration = const Duration(milliseconds: 650),
   }) {
@@ -44,7 +63,7 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
     );
   }
 
-  List<CardProperty<T>> get _visibleCardProperties {
+  List<CardProperty<D>> get _visibleCardProperties {
     final notJudgedCardProperties =
         _cardProperties.where((element) => !element.isJudged).toList();
     return notJudgedCardProperties.sublist(
@@ -53,7 +72,7 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
     );
   }
 
-  CardProperty<T>? get _focusCardProperty =>
+  CardProperty<D>? get _focusCardProperty =>
       _visibleCardProperties.isNotEmpty ? _visibleCardProperties.first : null;
 
   int? get _focusIndex {
@@ -67,7 +86,7 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
     return index;
   }
 
-  CardProperty<T>? get _rewindTarget {
+  CardProperty<D>? get _rewindTarget {
     final targetIndex = currentIndex - 1;
     if (targetIndex < 0) {
       return null;
@@ -80,12 +99,12 @@ class SwipeableStackController<T extends SwipeableStackIdentifiable>
   // true: removed focus card
   // false: didn't remove focus card.
   bool _arrangeCardProperties({
-    required List<T> newDataSet,
+    required List<D> newDataSet,
   }) {
     var _markRemovedFocusProperty = false;
     final newCardProperties = newDataSet
         .map(
-          (data) => CardProperty<T>(data: data),
+          (data) => CardProperty<D>(data: data),
         )
         .toList();
     // Prevent to remove card properties that have been
@@ -136,11 +155,11 @@ extension _IndexWhereOrNull<E> on List<E> {
   }
 }
 
-extension _CardPropertiesX<T extends SwipeableStackIdentifiable>
-    on List<CardProperty<T>> {
+extension _CardPropertiesX<D extends SwipeableStackIdentifiable>
+    on List<CardProperty<D>> {
   void _replaceAt(
     int index, {
-    required CardProperty<T> replacement,
+    required CardProperty<D> replacement,
   }) =>
       this.replaceRange(
         index,
@@ -170,19 +189,19 @@ extension _CardPropertiesX<T extends SwipeableStackIdentifiable>
 }
 
 extension _DifferenceX on List<SwipeableStackIdentifiable> {
-  List<T> addedDifference<T extends SwipeableStackIdentifiable>({
-    required List<T> newData,
+  List<D> addedDifference<D extends SwipeableStackIdentifiable>({
+    required List<D> newData,
   }) {
-    final oldDataSet = Set<T>.from(this);
-    final newDataSet = Set<T>.from(newData);
+    final oldDataSet = Set<D>.from(this);
+    final newDataSet = Set<D>.from(newData);
     return newDataSet.difference(oldDataSet).toList();
   }
 
-  List<T> removedDifference<T extends SwipeableStackIdentifiable>({
-    required List<T> newData,
+  List<D> removedDifference<D extends SwipeableStackIdentifiable>({
+    required List<D> newData,
   }) {
-    final oldDataSet = Set<T>.from(this);
-    final newDataSet = Set<T>.from(newData);
+    final oldDataSet = Set<D>.from(this);
+    final newDataSet = Set<D>.from(newData);
     return oldDataSet.difference(newDataSet).toList();
   }
 }
@@ -293,10 +312,16 @@ extension _SwipeableStackPositionX on SwipeableStackPosition {
   }
 }
 
-class SwipeableStack<T extends SwipeableStackIdentifiable>
+/// A widget that provides a stack with swipe action.
+///
+/// This widget can be used as a UI for users to like/nope.
+///
+/// The data to be passed to this Widget must inherit from [SwipeableStackIdentifiable],
+/// so that the data passed to this Widget will be unique, depending on the id.
+class SwipeableStack<D extends SwipeableStackIdentifiable>
     extends StatefulWidget {
   SwipeableStack({
-    SwipeableStackController<T>? controller,
+    SwipeableStackController<D>? controller,
     required this.dataSet,
     required this.builder,
     this.overlayBuilder,
@@ -307,31 +332,55 @@ class SwipeableStack<T extends SwipeableStackIdentifiable>
     this.swipeAssistDuration = const Duration(milliseconds: 650),
     this.viewFraction = 0.92,
     this.stackClipBehaviour = Clip.hardEdge,
-  })  : controller = controller ?? SwipeableStackController<T>(),
+  })  : controller = controller ?? SwipeableStackController<D>(),
         assert(0 <= viewFraction && viewFraction <= 1),
         assert(0 <= horizontalSwipeThreshold && horizontalSwipeThreshold <= 1),
         assert(0 <= verticalSwipeThreshold && verticalSwipeThreshold <= 1),
         super(key: controller?._swipeableStackStateKey);
 
-  final SwipeableStackController<T> controller;
-  final List<T> dataSet;
-  final SwipeableStackItemBuilder<T> builder;
-  final SwipeableStackOverlayBuilder<T>? overlayBuilder;
-  final SwipeCompletionCallback<T>? onSwipeCompleted;
-  final OnWillMoveNext<T>? onWillMoveNext;
+  /// An object to manipulate [SwipeableStack].
+  final SwipeableStackController<D> controller;
+
+  /// Data to display as cards.
+  final List<D> dataSet;
+
+  /// Builder for items to be displayed in [SwipeableStack].
+  final SwipeableStackItemBuilder<D> builder;
+
+  /// Builder for displaying an overlay on the most foreground card.
+  final SwipeableStackOverlayBuilder<D>? overlayBuilder;
+
+  /// Callback called when the Swipe is completed.
+  final SwipeCompletionCallback<D>? onSwipeCompleted;
+
+  /// Callback called just before launching the Swipe action.
+  ///
+  /// If this Callback returns false, the action will be canceled.
+  final OnWillMoveNext<D>? onWillMoveNext;
+
+  /// The second child size rate.
   final double viewFraction;
+
+  /// The threshold for horizontal swipes.
   final double horizontalSwipeThreshold;
+
+  /// The threshold for vertical swipes.
   final double verticalSwipeThreshold;
+
+  /// How fast should the widget be swiped out of the screen when letting go?
+  /// The faster you set this, the faster you're able to swipe another Widget of your stack.
   final Duration swipeAssistDuration;
+
+  /// Clip behavior of [Stack] in [SwipeableStack].
   final Clip stackClipBehaviour;
 
   @override
-  _SwipeableStackState<T> createState() => _SwipeableStackState<T>();
+  _SwipeableStackState<D> createState() => _SwipeableStackState<D>();
 }
 
-class _SwipeableStackState<T extends SwipeableStackIdentifiable>
-    extends State<SwipeableStack<T>> with TickerProviderStateMixin {
-  late final SwipeableStackController<T> _controller = widget.controller;
+class _SwipeableStackState<D extends SwipeableStackIdentifiable>
+    extends State<SwipeableStack<D>> with TickerProviderStateMixin {
+  late final SwipeableStackController<D> _controller = widget.controller;
 
   late final AnimationController _swipeCancelAnimationController =
       AnimationController(
@@ -374,12 +423,12 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
   void initState() {
     super.initState();
     _controller._cardProperties =
-        widget.dataSet.map((data) => CardProperty<T>(data: data)).toList();
+        widget.dataSet.map((data) => CardProperty<D>(data: data)).toList();
     _controller.addListener(_setState);
   }
 
   @override
-  void didUpdateWidget(covariant SwipeableStack<T> oldWidget) {
+  void didUpdateWidget(covariant SwipeableStack<D> oldWidget) {
     super.didUpdateWidget(oldWidget);
     final removedFocusProperty = _controller._arrangeCardProperties(
       newDataSet: widget.dataSet,
@@ -388,9 +437,7 @@ class _SwipeableStackState<T extends SwipeableStackIdentifiable>
       return;
     }
     _resetAnimations();
-    setState(() {
-      _focusCardPosition = null;
-    });
+    _focusCardPosition = null;
   }
 
   void _resetAnimations() {
