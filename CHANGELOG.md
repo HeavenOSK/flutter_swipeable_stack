@@ -1,3 +1,6 @@
+## 0.4.2
+- Fix: Call `notifyListeners()` in `addPostFrameCallback`.
+
 ## 0.4.1
 - Fix: Delete unnecessary `setState` in `_SwipeableStackState.didUpdateWidget`.
 
