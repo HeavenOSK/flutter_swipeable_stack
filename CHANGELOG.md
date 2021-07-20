@@ -1,3 +1,6 @@
+## 0.4.3
+- Improve: Not to use `GlobalKey`. 
+
 ## 0.4.2
 - Fix: Call `notifyListeners()` in `addPostFrameCallback`.
 
