@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:sprung/sprung.dart';
 
 import 'callbacks.dart';
 import 'card_property.dart';
@@ -258,7 +259,7 @@ extension _AnimationControllerX on AnimationController {
     ).animate(
       CurvedAnimation(
         parent: this,
-        curve: const ElasticOutCurve(0.95),
+        curve: Sprung.criticallyDamped,
       ),
     );
   }
