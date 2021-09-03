@@ -259,7 +259,10 @@ extension _AnimationControllerX on AnimationController {
     ).animate(
       CurvedAnimation(
         parent: this,
-        curve: Sprung.criticallyDamped,
+        curve: Sprung.custom(
+          stiffness: 180,
+          mass: 1.0,
+        ),
       ),
     );
   }

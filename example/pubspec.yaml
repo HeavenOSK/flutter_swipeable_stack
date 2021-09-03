@@ -7,6 +7,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  hooks_riverpod: ^1.0.0-dev.7
+  state_notifier:
   swipeable_stack:
     path:
       ../
